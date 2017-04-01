@@ -1,0 +1,3608 @@
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    1
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+2988 lines read, no errors in pass 1.
+                        ;
+                        ; 6 5 C 0 2   E X T E N D E D   O P C O D E S   T E S T
+                        ;
+                        ; Copyright (C) 2013-2017  Klaus Dormann
+                        ;
+                        ; This program is free software: you can redistribute it and/or modify
+                        ; it under the terms of the GNU General Public License as published by
+                        ; the Free Software Foundation, either version 3 of the License, or
+                        ; (at your option) any later version.
+                        ;
+                        ; This program is distributed in the hope that it will be useful,
+                        ; but WITHOUT ANY WARRANTY; without even the implied warranty of
+                        ; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+                        ; GNU General Public License for more details.
+                        ;
+                        ; You should have received a copy of the GNU General Public License
+                        ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                        
+                        
+                        ; This program is designed to test all additional 65C02 opcodes, addressing
+                        ; modes and functionality not available in the NMOS version of the 6502.
+                        ; The 6502_functional_test is a prerequisite to this test.
+                        ; NMI, IRQ, BRK, STP & WAI are covered in the 6502_interrupt_test.
+                        ; 
+                        ; version 09-feb-2017
+                        ; contact info at http://2m5.de or email K@2m5.de
+                        ;
+                        ; assembled with AS65 from http://www.kingswood-consulting.co.uk/assemblers/
+                        ; command line switches: -l -m -s2 -w -x -h0
+                        ;                         |  |  |   |  |  no page headers in listing
+                        ;                         |  |  |   |  65C02 extensions
+                        ;                         |  |  |   wide listing (133 char/col)
+                        ;                         |  |  write intel hex file instead of binary
+                        ;                         |  expand macros in listing
+                        ;                         generate pass2 listing
+                        ;
+                        ; No IO - should be run from a monitor with access to registers.
+                        ; To run load intel hex image with a load command, than alter PC to 400 hex
+                        ; (code_segment) and enter a go command.
+                        ; Loop on program counter determines error or successful completion of test.
+                        ; Check listing for relevant traps (jump/branch *).
+                        ; Please note that in early tests some instructions will have to be used before
+                        ; they are actually tested!
+                        ;
+                        ; RESET, NMI or IRQ should not occur and will be trapped if vectors are enabled.
+                        ; Tests documented behavior of the original 65C02 only!
+                        ; Decimal ops will only be tested with valid BCD operands and the V flag will
+                        ; be ignored as it is absolutely useless in decimal mode.
+                        ;
+                        ; Debugging hints:
+                        ;     Most of the code is written sequentially. if you hit a trap, check the
+                        ;   immediately preceeding code for the instruction to be tested. Results are
+                        ;   tested first, flags are checked second by pushing them onto the stack and
+                        ;   pulling them to the accumulator after the result was checked. The "real"
+                        ;   flags are no longer valid for the tested instruction at this time!
+                        ;     If the tested instruction was indexed, the relevant index (X or Y) must
+                        ;   also be checked. Opposed to the flags, X and Y registers are still valid.
+                        ;
+                        ; versions:
+                        ;   19-jul-2013  1st version distributed for testing
+                        ;   23-jul-2013  fixed BRA out of range due to larger trap macros
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    2
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        ;                added RAM integrity check
+                        ;   16-aug-2013  added error report to standard output option
+                        ;   23-aug-2015  change revoked
+                        ;   24-aug-2015  all self modifying immediate opcodes now execute in data RAM
+                        ;   28-aug-2015  fixed decimal adc/sbc immediate only testing carry
+                        ;   09-feb-2017  fixed RMB/SMB tested when they shouldn't be tested
+                        
+                        
+                        ; C O N F I G U R A T I O N
+                        
+                        ;ROM_vectors writable (0=no, 1=yes)
+                        ;if ROM vectors can not be used interrupts will not be trapped
+                        ;as a consequence BRK can not be tested but will be emulated to test RTI
+0001 =                  ROM_vectors = 1
+                        
+                        ;load_data_direct (0=move from code segment, 1=load directly)
+                        ;loading directly is preferred but may not be supported by your platform
+                        ;0 produces only consecutive object code, 1 is not suitable for a binary image
+0001 =                  load_data_direct = 1
+                        
+                        ;I_flag behavior (0=force enabled, 1=force disabled, 2=prohibit change, 3=allow
+                        ;change) 2 requires extra code and is not recommended.
+0003 =                  I_flag = 3
+                        
+                        ;configure memory - try to stay away from memory used by the system
+                        ;zero_page memory start address, $4e (78) consecutive Bytes required
+                        ;                                add 2 if I_flag = 2
+000a =                  zero_page = $a  
+                        
+                        ;data_segment memory start address, $63 (99) consecutive Bytes required
+                        ; + 12 Bytes at data_segment + $f9 (JMP indirect page cross test)
+0200 =                  data_segment = $200
+                            if (data_segment & $ff) != 0
+                                ERROR ERROR ERROR low byte of data_segment MUST be $00 !!
+                            endif  
+                        
+                        ;code_segment memory start address, 10kB of consecutive space required
+                        ;                                   add 1 kB if I_flag = 2
+0400 =                  code_segment = $400  
+                        
+                        ;added WDC only opcodes WAI & STP (0=test as NOPs, >0=no test)
+0001 =                  wdc_op = 1
+                        
+                        ;added Rockwell & WDC opcodes BBR, BBS, RMB & SMB
+                        ;(0=test as NOPs, 1=full test, >1=no test) 
+0001 =                  rkwl_wdc_op = 1
+                        
+                        ;report errors through I/O channel (0=use standard self trap loops, 1=include
+                        ;report.i65 as I/O channel, add 3 kB)
+0000 =                  report = 0
+                        
+                        ;RAM integrity test option. Checks for undesired RAM writes.
+                        ;set lowest non RAM or RAM mirror address page (-1=disable, 0=64k, $40=16k)
+                        ;leave disabled if a monitor, OS or background interrupt is allowed to alter RAM
+ffff =                  ram_top = -1
+                        
+                                noopt       ;do not take shortcuts
+                                
+                                include "config.i65"
+                        ; C O N F I G U R A T I O N
+                        
+                        ;This overrides the default configuration options
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    3
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+                        ;ROM_vectors writable (0=no, 1=yes)
+                        ;if ROM vectors can not be used interrupts will not be trapped
+                        ;as a consequence BRK can not be tested but will be emulated to test RTI
+0000 =                  ROM_vectors = 0
+                        
+                        ;code_segment memory start address, 13kB of consecutive space required
+                        ;                                   add 2.5 kB if I_flag = 2
+1b00 =                  code_segment = $1B00
+                        
+                        ;data_segment memory start address, $6A (106) consecutive Bytes required
+1900 =                  data_segment = code_segment - $200
+                            if (data_segment & $ff) != 0
+                                ERROR ERROR ERROR low byte of data_segment MUST be $00 !!
+                            endif
+                        
+                        ;added Rockwell & WDC opcodes BBR, BBS, RMB & SMB
+                        ;(0=test as NOPs, 1=full test, >1=no test)
+0000 =                  rkwl_wdc_op = 0
+                        
+                        ;report errors through I/O channel (0=use standard self trap loops, 1=include
+                        ;report.i65 as I/O channel, add 3.5 kB)
+0001 =                  report = 1
+                        
+                        ;RAM integrity test option. Checks for undesired RAM writes.
+                        ;set lowest non RAM or RAM mirror address page (-1=disable, 0=64k, $40=16k)
+                        ;leave disabled if a monitor, OS or background interrupt is allowed to alter RAM
+ffff =                  ram_top = -1
+                        
+                        ; Reserve a byte at $0 to include it in the binary
+0000 =                          org $0
+0000 : 00                       ds 1
+                        
+                        
+                        ;macros for error & success traps to allow user modification
+                        ;example:
+                        ;trap    macro
+                        ;        jsr my_error_handler
+                        ;        endm
+                        ;trap_eq macro
+                        ;        bne skip\?
+                        ;        trap           ;failed equal (zero)
+                        ;skip\?
+                        ;        endm
+                        ;
+                        ; my_error_handler should pop the calling address from the stack and report it.
+                        ; putting larger portions of code (more than 3 bytes) inside the trap macro
+                        ; may lead to branch range problems for some tests.
+                            if report = 0
+                        trap    macro
+                                jmp *           ;failed anyway
+                                endm
+                        trap_eq macro
+                                beq *           ;failed equal (zero)
+                                endm
+                        trap_ne macro
+                                bne *           ;failed not equal (non zero)
+                                endm
+                        trap_cs macro
+                                bcs *           ;failed carry set
+                                endm
+                        trap_cc macro
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    4
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                bcc *           ;failed carry clear
+                                endm
+                        trap_mi macro
+                                bmi *           ;failed minus (bit 7 set)
+                                endm
+                        trap_pl macro
+                                bpl *           ;failed plus (bit 7 clear)
+                                endm
+                        trap_vs macro
+                                bvs *           ;failed overflow set
+                                endm
+                        trap_vc macro
+                                bvc *           ;failed overflow clear
+                                endm
+                        ; please observe that during the test the stack gets invalidated
+                        ; therefore a RTS inside the success macro is not possible
+                        success macro
+                                jmp *           ;test passed, no errors
+                                endm
+                            endif
+                            if report = 1
+                        trap    macro
+                                jsr report_error
+                                endm
+                        trap_eq macro
+                                bne skip\?
+                                trap           ;failed equal (zero)
+                        skip\?
+                                endm
+                        trap_ne macro
+                                beq skip\?
+                                trap            ;failed not equal (non zero)
+                        skip\?
+                                endm
+                        trap_cs macro
+                                bcc skip\?
+                                trap            ;failed carry set
+                        skip\?
+                                endm
+                        trap_cc macro
+                                bcs skip\?
+                                trap            ;failed carry clear
+                        skip\?
+                                endm
+                        trap_mi macro
+                                bpl skip\?
+                                trap            ;failed minus (bit 7 set)
+                        skip\?
+                                endm
+                        trap_pl macro
+                                bmi skip\?
+                                trap            ;failed plus (bit 7 clear)
+                        skip\?
+                                endm
+                        trap_vs macro
+                                bvc skip\?
+                                trap            ;failed overflow set
+                        skip\?
+                                endm
+                        trap_vc macro
+                                bvs skip\?
+                                trap            ;failed overflow clear
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    5
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        skip\?
+                                endm
+                        ; please observe that during the test the stack gets invalidated
+                        ; therefore a RTS inside the success macro is not possible
+                        success macro
+                                jsr report_success
+                                endm
+                            endif
+                        
+                        
+0001 =                  carry   equ %00000001   ;flag bits in status
+0002 =                  zero    equ %00000010
+0004 =                  intdis  equ %00000100
+0008 =                  decmode equ %00001000
+0010 =                  break   equ %00010000
+0020 =                  reserv  equ %00100000
+0040 =                  overfl  equ %01000000
+0080 =                  minus   equ %10000000
+                        
+0001 =                  fc      equ carry
+0002 =                  fz      equ zero
+0003 =                  fzc     equ carry+zero
+0040 =                  fv      equ overfl
+0042 =                  fvz     equ overfl+zero
+0080 =                  fn      equ minus
+0081 =                  fnc     equ minus+carry
+0082 =                  fnz     equ minus+zero
+0083 =                  fnzc    equ minus+zero+carry
+00c0 =                  fnv     equ minus+overfl
+                        
+0030 =                  fao     equ break+reserv    ;bits always on after PHP, BRK
+0034 =                  fai     equ fao+intdis      ;+ forced interrupt disable
+00ff =                  m8      equ $ff             ;8 bit mask
+00fb =                  m8i     equ $ff&~intdis     ;8 bit mask - interrupt disable
+                        
+                        ;macros to allow masking of status bits.
+                        ;masking of interrupt enable/disable on load and compare
+                        ;masking of always on bits after PHP or BRK (unused & break) on compare
+                                if I_flag = 0
+                        load_flag   macro
+                                    lda #\1&m8i         ;force enable interrupts (mask I)
+                                    endm
+                        cmp_flag    macro
+                                    cmp #(\1|fao)&m8i   ;I_flag is always enabled + always on bits
+                                    endm
+                        eor_flag    macro
+                                    eor #(\1&m8i|fao)   ;mask I, invert expected flags + always on bits
+                                    endm
+                                endif
+                                if I_flag = 1
+                        load_flag   macro
+                                    lda #\1|intdis      ;force disable interrupts
+                                    endm
+                        cmp_flag    macro
+                                    cmp #(\1|fai)&m8    ;I_flag is always disabled + always on bits
+                                    endm
+                        eor_flag    macro
+                                    eor #(\1|fai)       ;invert expected flags + always on bits + I
+                                    endm
+                                endif
+                                if I_flag = 2
+                        load_flag   macro
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    6
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                    lda #\1
+                                    ora flag_I_on       ;restore I-flag
+                                    and flag_I_off
+                                    endm
+                        cmp_flag    macro
+                                    eor flag_I_on       ;I_flag is never changed
+                                    cmp #(\1|fao)&m8i   ;expected flags + always on bits, mask I
+                                    endm
+                        eor_flag    macro
+                                    eor flag_I_on       ;I_flag is never changed
+                                    eor #(\1&m8i|fao)   ;mask I, invert expected flags + always on bits
+                                    endm
+                                endif
+                                if I_flag = 3
+                        load_flag   macro
+                                    lda #\1             ;allow test to change I-flag (no mask)
+                                    endm
+                        cmp_flag    macro
+                                    cmp #(\1|fao)&m8    ;expected flags + always on bits
+                                    endm
+                        eor_flag    macro
+                                    eor #\1|fao         ;invert expected flags + always on bits
+                                    endm
+                                endif
+                        
+                        ;macros to set (register|memory|zeropage) & status
+                        set_stat    macro       ;setting flags in the processor status register
+                                    load_flag \1
+                                    pha         ;use stack to load status
+                                    plp
+                                    endm
+                        
+                        set_a       macro       ;precharging accu & status
+                                    load_flag \2
+                                    pha         ;use stack to load status
+                                    lda #\1     ;precharge accu
+                                    plp
+                                    endm
+                        
+                        set_x       macro       ;precharging index & status
+                                    load_flag \2
+                                    pha         ;use stack to load status
+                                    ldx #\1     ;precharge index x
+                                    plp
+                                    endm
+                        
+                        set_y       macro       ;precharging index & status
+                                    load_flag \2
+                                    pha         ;use stack to load status
+                                    ldy #\1     ;precharge index y
+                                    plp
+                                    endm
+                        
+                        set_ax      macro       ;precharging indexed accu & immediate status
+                                    load_flag \2
+                                    pha         ;use stack to load status
+                                    lda \1,x    ;precharge accu
+                                    plp
+                                    endm
+                        
+                        set_ay      macro       ;precharging indexed accu & immediate status
+                                    load_flag \2
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    7
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                    pha         ;use stack to load status
+                                    lda \1,y    ;precharge accu
+                                    plp
+                                    endm
+                        
+                        set_z       macro       ;precharging indexed zp & immediate status
+                                    load_flag \2
+                                    pha         ;use stack to load status
+                                    lda \1,x    ;load to zeropage
+                                    sta zpt
+                                    plp
+                                    endm
+                        
+                        set_zx      macro       ;precharging zp,x & immediate status
+                                    load_flag \2
+                                    pha         ;use stack to load status
+                                    lda \1,x    ;load to indexed zeropage
+                                    sta zpt,x
+                                    plp
+                                    endm
+                        
+                        set_abs     macro       ;precharging indexed memory & immediate status
+                                    load_flag \2
+                                    pha         ;use stack to load status
+                                    lda \1,x    ;load to memory
+                                    sta abst
+                                    plp
+                                    endm
+                        
+                        set_absx    macro       ;precharging abs,x & immediate status
+                                    load_flag \2
+                                    pha         ;use stack to load status
+                                    lda \1,x    ;load to indexed memory
+                                    sta abst,x
+                                    plp
+                                    endm
+                        
+                        ;macros to test (register|memory|zeropage) & status & (mask)
+                        tst_stat    macro       ;testing flags in the processor status register
+                                    php         ;save status
+                                    pla         ;use stack to retrieve status
+                                    pha
+                                    cmp_flag \1
+                                    trap_ne
+                                    plp         ;restore status
+                                    endm
+                                    
+                        tst_a       macro       ;testing result in accu & flags
+                                    php         ;save flags
+                                    cmp #\1     ;test result
+                                    trap_ne
+                                    pla         ;load status
+                                    pha
+                                    cmp_flag \2
+                                    trap_ne
+                                    plp         ;restore status
+                                    endm
+                        
+                        tst_as      macro       ;testing result in accu & flags, save accu
+                                    pha
+                                    php         ;save flags
+                                    cmp #\1     ;test result
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    8
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                    trap_ne
+                                    pla         ;load status
+                                    pha
+                                    cmp_flag \2
+                                    trap_ne
+                                    plp         ;restore status
+                                    pla
+                                    endm
+                        
+                        tst_x       macro       ;testing result in x index & flags
+                                    php         ;save flags
+                                    cpx #\1     ;test result
+                                    trap_ne
+                                    pla         ;load status
+                                    pha
+                                    cmp_flag \2
+                                    trap_ne
+                                    plp         ;restore status
+                                    endm
+                        
+                        tst_y       macro       ;testing result in y index & flags
+                                    php         ;save flags
+                                    cpy #\1     ;test result
+                                    trap_ne
+                                    pla         ;load status
+                                    pha
+                                    cmp_flag \2
+                                    trap_ne
+                                    plp         ;restore status
+                                    endm
+                        
+                        tst_ax      macro       ;indexed testing result in accu & flags
+                                    php         ;save flags
+                                    cmp \1,x    ;test result
+                                    trap_ne
+                                    pla         ;load status
+                                    eor_flag \3
+                                    cmp \2,x    ;test flags
+                                    trap_ne     ;
+                                    endm
+                        
+                        tst_ay      macro       ;indexed testing result in accu & flags
+                                    php         ;save flags
+                                    cmp \1,y    ;test result
+                                    trap_ne     ;
+                                    pla         ;load status
+                                    eor_flag \3
+                                    cmp \2,y    ;test flags
+                                    trap_ne
+                                    endm
+                                
+                        tst_z       macro       ;indexed testing result in zp & flags
+                                    php         ;save flags
+                                    lda zpt
+                                    cmp \1,x    ;test result
+                                    trap_ne
+                                    pla         ;load status
+                                    eor_flag \3
+                                    cmp \2,x    ;test flags
+                                    trap_ne
+                                    endm
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    9
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        tst_zx      macro       ;testing result in zp,x & flags
+                                    php         ;save flags
+                                    lda zpt,x
+                                    cmp \1,x    ;test result
+                                    trap_ne
+                                    pla         ;load status
+                                    eor_flag \3
+                                    cmp \2,x    ;test flags
+                                    trap_ne
+                                    endm
+                        
+                        tst_abs     macro       ;indexed testing result in memory & flags
+                                    php         ;save flags
+                                    lda abst
+                                    cmp \1,x    ;test result
+                                    trap_ne
+                                    pla         ;load status
+                                    eor_flag \3
+                                    cmp \2,x    ;test flags
+                                    trap_ne
+                                    endm
+                        
+                        tst_absx    macro       ;testing result in abs,x & flags
+                                    php         ;save flags
+                                    lda abst,x
+                                    cmp \1,x    ;test result
+                                    trap_ne
+                                    pla         ;load status
+                                    eor_flag \3
+                                    cmp \2,x    ;test flags
+                                    trap_ne
+                                    endm
+                                    
+                        ; RAM integrity test
+                        ;   verifies that none of the previous tests has altered RAM outside of the
+                        ;   designated write areas.
+                        ;   uses zpt word as indirect pointer, zpt+2 word as checksum
+                                if ram_top > -1
+                        check_ram   macro 
+                                    cld
+                                    lda #0
+                                    sta zpt         ;set low byte of indirect pointer
+                                    sta zpt+3       ;checksum high byte
+                                    ldx #11         ;reset modifiable RAM
+                        ccs1\?      sta jxi_tab,x   ;JMP indirect page cross area
+                                    dex
+                                    bpl ccs1\?
+                                    clc
+                                    ldx #zp_bss-zero_page ;zeropage - write test area
+                        ccs3\?      adc zero_page,x
+                                    bcc ccs2\?
+                                    inc zpt+3       ;carry to high byte
+                                    clc
+                        ccs2\?      inx
+                                    bne ccs3\?
+                                    ldx #hi(abs1)   ;set high byte of indirect pointer
+                                    stx zpt+1
+                                    ldy #lo(abs1)   ;data after write & execute test area
+                        ccs5\?      adc (zpt),y
+                                    bcc ccs4\?
+                                    inc zpt+3       ;carry to high byte
+                                    clc
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   10
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        ccs4\?      iny
+                                    bne ccs5\?
+                                    inx             ;advance RAM high address
+                                    stx zpt+1
+                                    cpx #ram_top
+                                    bne ccs5\?
+                                    sta zpt+2       ;checksum low is
+                                    cmp ram_chksm   ;checksum low expected
+                                    trap_ne         ;checksum mismatch
+                                    lda zpt+3       ;checksum high is
+                                    cmp ram_chksm+1 ;checksum high expected
+                                    trap_ne         ;checksum mismatch
+                                    endm            
+                                else
+                        check_ram   macro
+                                    ;RAM check disabled - RAM size not set
+                                    endm
+                                endif
+                                    
+                        next_test   macro           ;make sure, tests don't jump the fence
+                                    lda test_case   ;previous test
+                                    cmp #test_num
+                                    trap_ne         ;test is out of sequence
+                        test_num = test_num + 1
+                                    lda #test_num   ;*** next tests' number
+                                    sta test_case
+                                    ;check_ram       ;uncomment to find altered RAM after each test
+                                    endm
+                        
+                            if load_data_direct = 1
+                                data
+                            else
+                                bss                 ;uninitialized segment, copy of data at end of code!
+                            endif
+000a =                          org zero_page
+                            if I_flag = 2
+                        ;masking for I bit in status
+                        flag_I_on   ds  1           ;or mask to load flags   
+                        flag_I_off  ds  1           ;and mask to load flags
+                            endif
+000a :                  zpt                         ;5 bytes store/modify test area
+                        ;add/subtract operand generation and result/flag prediction
+000a : 00               adfc    ds  1               ;carry flag before op
+000b : 00               ad1     ds  1               ;operand 1 - accumulator
+000c : 00               ad2     ds  1               ;operand 2 - memory / immediate
+000d : 00               adrl    ds  1               ;expected result bits 0-7
+000e : 00               adrh    ds  1               ;expected result bit 8 (carry)
+000f : 00               adrf    ds  1               ;expected flags NV0000ZC (-V in decimal mode)
+0010 : 00               sb2     ds  1               ;operand 2 complemented for subtract
+0011 :                  zp_bss
+0011 : c3824100         zp1     db  $c3,$82,$41,0   ;test patterns for LDx BIT ROL ROR ASL LSR
+0015 : 7f               zp7f    db  $7f             ;test pattern for compare  
+                        ;logical zeropage operands
+0016 : 001f7180         zpOR    db  0,$1f,$71,$80   ;test pattern for OR
+001a : 0fff7f80         zpAN    db  $0f,$ff,$7f,$80 ;test pattern for AND
+001e : ff0f8f8f         zpEO    db  $ff,$0f,$8f,$8f ;test pattern for EOR
+                        ;indirect addressing pointers
+0022 : 1019             ind1    dw  abs1            ;indirect pointer to pattern in absolute memory
+0024 : 1119                     dw  abs1+1
+0026 : 1219                     dw  abs1+2
+0028 : 1319                     dw  abs1+3
+002a : 1419                     dw  abs7f
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   11
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+002c : 1818             inw1    dw  abs1-$f8        ;indirect pointer for wrap-test pattern
+002e : 0519             indt    dw  abst            ;indirect pointer to store area in absolute memory
+0030 : 0619                     dw  abst+1
+0032 : 0719                     dw  abst+2
+0034 : 0819                     dw  abst+3
+0036 : 0d18             inwt    dw  abst-$f8        ;indirect pointer for wrap-test store
+0038 : 4719             indAN   dw  absAN           ;indirect pointer to AND pattern in absolute memory
+003a : 4819                     dw  absAN+1
+003c : 4919                     dw  absAN+2
+003e : 4a19                     dw  absAN+3
+0040 : 4b19             indEO   dw  absEO           ;indirect pointer to EOR pattern in absolute memory
+0042 : 4c19                     dw  absEO+1
+0044 : 4d19                     dw  absEO+2
+0046 : 4e19                     dw  absEO+3
+0048 : 4319             indOR   dw  absOR           ;indirect pointer to OR pattern in absolute memory
+004a : 4419                     dw  absOR+1
+004c : 4519                     dw  absOR+2
+004e : 4619                     dw  absOR+3
+                        ;add/subtract indirect pointers
+0050 : 0519             adi2    dw  ada2            ;indirect pointer to operand 2 in absolute memory
+0052 : 0619             sbi2    dw  sba2            ;indirect pointer to complemented operand 2 (SBC)
+0054 : 0618             adiy2   dw  ada2-$ff        ;with offset for indirect indexed
+0056 : 0718             sbiy2   dw  sba2-$ff
+0058 :                  zp_bss_end
+                            
+1900 =                          org data_segment
+1900 : 0000             pg_x    ds  2               ;high JMP indirect address for page cross bug
+1902 : 00               test_case   ds  1           ;current test number
+1903 : 0000             ram_chksm   ds  2           ;checksum for RAM integrity test
+                        ;add/subtract operand copy - abs tests write area
+1905 :                  abst                        ;5 bytes store/modify test area
+1905 : 00               ada2    ds  1               ;operand 2
+1906 : 00               sba2    ds  1               ;operand 2 complemented for subtract
+1907 : 000000                   ds  3               ;fill remaining bytes
+190a :                  data_bss
+                            if load_data_direct = 1
+190a : 6900             ex_adci adc #0              ;execute immediate opcodes
+190c : 60                       rts
+190d : e900             ex_sbci sbc #0              ;execute immediate opcodes
+190f : 60                       rts
+                            else
+                        ex_adci ds  3
+                        ex_sbci ds  3
+                            endif
+1910 : c3824100         abs1    db  $c3,$82,$41,0   ;test patterns for LDx BIT ROL ROR ASL LSR
+1914 : 7f               abs7f   db  $7f             ;test pattern for compare
+                        ;loads
+1915 : 80800002         fLDx    db  fn,fn,0,fz      ;expected flags for load
+                        ;shifts
+1919 :                  rASL                        ;expected result ASL & ROL -carry  
+1919 : 86048200         rROL    db  $86,$04,$82,0   ; "
+191d : 87058301         rROLc   db  $87,$05,$83,1   ;expected result ROL +carry
+1921 :                  rLSR                        ;expected result LSR & ROR -carry
+1921 : 61412000         rROR    db  $61,$41,$20,0   ; "
+1925 : e1c1a080         rRORc   db  $e1,$c1,$a0,$80 ;expected result ROR +carry
+1929 :                  fASL                        ;expected flags for shifts
+1929 : 81018002         fROL    db  fnc,fc,fn,fz    ;no carry in
+192d : 81018000         fROLc   db  fnc,fc,fn,0     ;carry in
+1931 :                  fLSR
+1931 : 01000102         fROR    db  fc,0,fc,fz      ;no carry in
+1935 : 81808180         fRORc   db  fnc,fn,fnc,fn   ;carry in
+                        ;increments (decrements)
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   12
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+1939 : 7f80ff0001       rINC    db  $7f,$80,$ff,0,1 ;expected result for INC/DEC
+193e : 0080800200       fINC    db  0,fn,fn,fz,0    ;expected flags for INC/DEC
+                        ;logical memory operand
+1943 : 001f7180         absOR   db  0,$1f,$71,$80   ;test pattern for OR
+1947 : 0fff7f80         absAN   db  $0f,$ff,$7f,$80 ;test pattern for AND
+194b : ff0f8f8f         absEO   db  $ff,$0f,$8f,$8f ;test pattern for EOR
+                        ;logical accu operand
+194f : 00f11f00         absORa  db  0,$f1,$1f,0     ;test pattern for OR
+1953 : f0ffffff         absANa  db  $f0,$ff,$ff,$ff ;test pattern for AND
+1957 : fff0f00f         absEOa  db  $ff,$f0,$f0,$0f ;test pattern for EOR
+                        ;logical results
+195b : 00ff7f80         absrlo  db  0,$ff,$7f,$80
+195f : 02800080         absflo  db  fz,fn,0,fn
+1963 :                  data_bss_end
+                        ;define area for page crossing JMP (abs) & JMP (abs,x) test
+19f9 =                  jxi_tab equ data_segment + $100 - 7     ;JMP (jxi_tab,x) x=6
+19fd =                  ji_tab  equ data_segment + $100 - 3     ;JMP (ji_tab+2)
+1a00 =                  jxp_tab equ data_segment + $100         ;JMP (jxp_tab-255) x=255
+                        
+                        
+                                code
+1b00 =                          org code_segment
+1b00 : d8               start   cld
+1b01 : a2ff                     ldx #$ff
+1b03 : 9a                       txs
+1b04 : a900                     lda #0          ;*** test 0 = initialize
+1b06 : 8d0219                   sta test_case
+0000 =                  test_num = 0
+                        
+                        ;stop interrupts before initializing BSS
+                            if I_flag = 1
+                                sei
+                            endif
+                            
+                        ;initialize I/O for report channel
+                            if report = 1
+1b09 : 201147                   jsr report_init
+                            endif
+                            
+                        ;initialize BSS segment
+                            if load_data_direct != 1
+                                ldx #zp_end-zp_init-1
+                        ld_zp   lda zp_init,x
+                                sta zp_bss,x
+                                dex
+                                bpl ld_zp
+                                ldx #data_end-data_init-1
+                        ld_data lda data_init,x
+                                sta data_bss,x
+                                dex
+                                bpl ld_data
+                              if ROM_vectors = 1
+                                ldx #5
+                        ld_vect lda vec_init,x
+                                sta vec_bss,x
+                                dex
+                                bpl ld_vect
+                              endif
+                            endif
+                        
+                        ;retain status of interrupt flag
+                            if I_flag = 2
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   13
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                php
+                                pla
+                                and #4          ;isolate flag
+                                sta flag_I_on   ;or mask
+                                eor #lo(~4)     ;reverse
+                                sta flag_I_off  ;and mask
+                            endif
+                                
+                        ;generate checksum for RAM integrity test
+                            if ram_top > -1
+                                lda #0 
+                                sta zpt         ;set low byte of indirect pointer
+                                sta ram_chksm+1 ;checksum high byte
+                                ldx #11         ;reset modifiable RAM
+                        gcs1    sta jxi_tab,x   ;JMP indirect page cross area
+                                dex
+                                bpl gcs1
+                                clc
+                                ldx #zp_bss-zero_page ;zeropage - write test area
+                        gcs3    adc zero_page,x
+                                bcc gcs2
+                                inc ram_chksm+1 ;carry to high byte
+                                clc
+                        gcs2    inx
+                                bne gcs3
+                                ldx #hi(abs1)   ;set high byte of indirect pointer
+                                stx zpt+1
+                                ldy #lo(abs1)   ;data after write & execute test area
+                        gcs5    adc (zpt),y
+                                bcc gcs4
+                                inc ram_chksm+1 ;carry to high byte
+                                clc
+                        gcs4    iny
+                                bne gcs5
+                                inx             ;advance RAM high address
+                                stx zpt+1
+                                cpx #ram_top
+                                bne gcs5
+                                sta ram_chksm   ;checksum complete
+                            endif
+                                next_test            
+                        
+                        
+                        ;testing stack operations PHX PHY PLX PLY
+1b1b : a999                     lda #$99        ;protect a
+1b1d : a2ff                     ldx #$ff        ;initialize stack
+1b1f : 9a                       txs
+1b20 : a255                     ldx #$55
+1b22 : da                       phx
+1b23 : a2aa                     ldx #$aa
+1b25 : da                       phx
+1b26 : ecfe01                   cpx $1fe        ;on stack ?
+                                trap_ne
+                        
+1b2e : ba                       tsx
+1b2f : e0fd                     cpx #$fd        ;sp decremented?
+                                trap_ne
+                        
+1b36 : 7a                       ply
+1b37 : c0aa                     cpy #$aa        ;successful retreived from stack?
+                                trap_ne
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   14
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+1b3e : 7a                       ply
+1b3f : c055                     cpy #$55
+                                trap_ne
+                        
+1b46 : ccff01                   cpy $1ff        ;remains on stack?
+                                trap_ne
+                        
+1b4e : ba                       tsx
+1b4f : e0ff                     cpx #$ff        ;sp incremented?
+                                trap_ne
+                        
+                                
+1b56 : a0a5                     ldy #$a5
+1b58 : 5a                       phy
+1b59 : a05a                     ldy #$5a
+1b5b : 5a                       phy
+1b5c : ccfe01                   cpy $1fe        ;on stack ?
+                                trap_ne
+                        
+1b64 : ba                       tsx
+1b65 : e0fd                     cpx #$fd        ;sp decremented?
+                                trap_ne
+                        
+1b6c : fa                       plx
+1b6d : e05a                     cpx #$5a        ;successful retreived from stack?
+                                trap_ne
+                        
+1b74 : fa                       plx
+1b75 : e0a5                     cpx #$a5
+                                trap_ne
+                        
+1b7c : ecff01                   cpx $1ff        ;remains on stack?
+                                trap_ne
+                        
+1b84 : ba                       tsx
+1b85 : e0ff                     cpx #$ff        ;sp incremented?
+                                trap_ne
+                        
+1b8c : c999                     cmp #$99        ;unchanged?
+                                trap_ne
+                        
+                                next_test            
+                        
+                                
+                        ; test PHX does not alter flags or X but PLX does
+1ba2 : a0aa                     ldy #$aa        ;protect y
+                                set_x 1,$ff     ;push
+                        
+1baa : da                       phx
+                                tst_x 1,$ff
+                        
+                                set_x 0,0
+                        
+1bc3 : da                       phx
+                                tst_x 0,0
+                        
+                                set_x $ff,$ff
+                        
+1bdc : da                       phx
+                                tst_x $ff,$ff
+                        
+                                set_x 1,0
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   15
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+1bf5 : da                       phx
+                                tst_x 1,0
+                        
+                                set_x 0,$ff
+                        
+1c0e : da                       phx
+                                tst_x 0,$ff
+                        
+                                set_x $ff,0
+                        
+1c27 : da                       phx
+                                tst_x $ff,0
+                        
+                                set_x 0,$ff     ;pull
+                        
+1c40 : fa                       plx
+                                tst_x $ff,$ff-zero
+                        
+                                set_x $ff,0
+                        
+1c59 : fa                       plx
+                                tst_x 0,zero
+                        
+                                set_x $fe,$ff
+                        
+1c72 : fa                       plx
+                                tst_x 1,$ff-zero-minus
+                        
+                                set_x 0,0
+                        
+1c8b : fa                       plx
+                                tst_x $ff,minus
+                        
+                                set_x $ff,$ff
+                        
+1ca4 : fa                       plx
+                                tst_x 0,$ff-minus
+                        
+                                set_x $fe,0
+                        
+1cbd : fa                       plx
+                                tst_x 1,0
+                        
+1cd0 : c0aa                     cpy #$aa        ;Y unchanged
+                                trap_ne
+                        
+                                next_test            
+                        
+                         
+                        ; test PHY does not alter flags or Y but PLY does
+1ce6 : a255                     ldx #$55        ;x & a protected
+                                set_y 1,$ff     ;push
+                        
+1cee : 5a                       phy
+                                tst_y 1,$ff
+                        
+                                set_y 0,0
+                        
+1d07 : 5a                       phy
+                                tst_y 0,0
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   16
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                set_y $ff,$ff
+                        
+1d20 : 5a                       phy
+                                tst_y $ff,$ff
+                        
+                                set_y 1,0
+                        
+1d39 : 5a                       phy
+                                tst_y 1,0
+                        
+                                set_y 0,$ff
+                        
+1d52 : 5a                       phy
+                                tst_y 0,$ff
+                        
+                                set_y $ff,0
+                        
+1d6b : 5a                       phy
+                                tst_y $ff,0
+                        
+                                set_y 0,$ff     ;pull
+                        
+1d84 : 7a                       ply
+                                tst_y $ff,$ff-zero
+                        
+                                set_y $ff,0
+                        
+1d9d : 7a                       ply
+                                tst_y 0,zero
+                        
+                                set_y $fe,$ff
+                        
+1db6 : 7a                       ply
+                                tst_y 1,$ff-zero-minus
+                        
+                                set_y 0,0
+                        
+1dcf : 7a                       ply
+                                tst_y $ff,minus
+                        
+                                set_y $ff,$ff
+                        
+1de8 : 7a                       ply
+                                tst_y 0,$ff-minus
+                        
+                                set_y $fe,0
+                        
+1e01 : 7a                       ply
+                                tst_y 1,0
+                        
+1e14 : e055                     cpx #$55        ;x unchanged?
+                                trap_ne
+                        
+                                next_test            
+                        
+                         
+                        ; PC modifying instructions (BRA, BBR, BBS, 1, 2, 3 byte NOPs, JMP(abs,x))
+                        ; testing unconditional branch BRA
+                        
+1e2a : a281                     ldx #$81        ;protect unused registers
+1e2c : a07e                     ldy #$7e
+                                set_a 0,$ff
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   17
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+1e34 : 8003                     bra br1         ;branch should always be taken
+                                trap 
+                        
+1e39 :                  br1
+                                tst_a 0,$ff
+                        
+                                set_a $ff,0
+                        
+1e51 : 8003                     bra br2         ;branch should always be taken
+                                trap 
+                        
+1e56 :                  br2
+                                tst_a $ff,0
+                        
+1e68 : e081                     cpx #$81
+                                trap_ne
+                        
+1e6f : c07e                     cpy #$7e
+                                trap_ne
+                        
+                                next_test            
+                        
+                                
+1e85 : a000                     ldy #0          ;branch range test  
+1e87 : 8076                     bra bra0
+                                
+1e89 : c001             bra1    cpy #1
+                                trap_ne         ;long range backward
+                        
+1e90 : c8                       iny        
+1e91 : 8062                     bra bra2
+                                        
+1e93 : c003             bra3    cpy #3
+                                trap_ne         ;long range backward
+                        
+1e9a : c8                       iny        
+1e9b : 804e                     bra bra4
+                                        
+1e9d : c005             bra5    cpy #5
+                                trap_ne         ;long range backward
+                        
+1ea4 : c8                       iny        
+1ea5 : a000                     ldy #0
+1ea7 : 8004                     bra brf0
+                                
+1ea9 : c8                       iny
+1eaa : c8                       iny
+1eab : c8                       iny
+1eac : c8                       iny        
+1ead : 8003             brf0    bra brf1
+                        
+1eaf : c8                       iny
+1eb0 : c8                       iny
+1eb1 : c8                       iny
+1eb2 : c8               brf1    iny        
+1eb3 : 8002                     bra brf2
+                                
+1eb5 : c8                       iny
+1eb6 : c8                       iny
+1eb7 : c8               brf2    iny
+1eb8 : c8                       iny        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   18
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+1eb9 : 8001                     bra brf3
+                                
+1ebb : c8                       iny
+1ebc : c8               brf3    iny
+1ebd : c8                       iny
+1ebe : c8                       iny        
+1ebf : 8000                     bra brf4
+                                
+1ec1 : c8               brf4    iny
+1ec2 : c8                       iny
+1ec3 : c8                       iny
+1ec4 : c8                       iny
+1ec5 : c00a                     cpy #10
+                                trap_ne     ;short range forward
+                        
+1ecc : 8012                     bra brb0
+                        
+1ece : 88               brb4    dey
+1ecf : 88                       dey
+1ed0 : 88                       dey
+1ed1 : 88                       dey
+1ed2 : 800e                     bra brb5        
+                        
+1ed4 : 88               brb3    dey
+1ed5 : 88                       dey
+1ed6 : 88                       dey
+1ed7 : 80f5                     bra brb4        
+                        
+1ed9 : 88               brb2    dey
+1eda : 88                       dey
+1edb : 80f7                     bra brb3        
+                        
+1edd : 88               brb1    dey
+1ede : 80f9                     bra brb2        
+                        
+1ee0 : 80fb             brb0    bra brb1        
+                        
+1ee2 : c000             brb5    cpy #0
+                                trap_ne     ;short range backward
+                        
+1ee9 : 801e                     bra bra6
+                        
+1eeb : c004             bra4    cpy #4
+                                trap_ne     ;long range forward
+                        
+1ef2 : c8                       iny        
+1ef3 : 80a8                     bra bra5
+                                        
+1ef5 : c002             bra2    cpy #2
+                                trap_ne     ;long range forward
+                        
+1efc : c8                       iny        
+1efd : 8094                     bra bra3
+                                        
+1eff : c000             bra0    cpy #0
+                                trap_ne     ;long range forward
+                        
+1f06 : c8                       iny        
+1f07 : 8080                     bra bra1
+                                        
+1f09 :                  bra6
+                                next_test
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   19
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+                                
+                            if rkwl_wdc_op = 1
+                        ; testing BBR & BBS
+                        
+                        bbt     macro           ;\1 = bitnum
+                                lda #(1<<\1)    ;testing 1 bit on
+                                sta zpt
+                                set_a $33,0     ;with flags off
+                                bbr \1,zpt,fail1\?
+                                bbs \1,zpt,ok1\?
+                                trap            ;bbs branch not taken
+                        fail1\?
+                                trap            ;bbr branch taken
+                        ok1\?   
+                                tst_a $33,0
+                                set_a $cc,$ff   ;with flags on
+                                bbr \1,zpt,fail2\?
+                                bbs \1,zpt,ok2\?
+                                trap            ;bbs branch not taken
+                        fail2\? 
+                                trap            ;bbr branch taken
+                        ok2\?   
+                                tst_a $cc,$ff
+                                lda zpt
+                                cmp #(1<<\1)
+                                trap_ne         ;zp altered
+                                lda #$ff-(1<<\1) ;testing 1 bit off
+                                sta zpt
+                                set_a $33,0     ;with flags off
+                                bbs \1,zpt,fail3\?
+                                bbr \1,zpt,ok3\?
+                                trap            ;bbr branch not taken
+                        fail3\? 
+                                trap            ;bbs branch taken
+                        ok3\?   
+                                tst_a $33,0
+                                set_a $cc,$ff   ;with flags on
+                                bbs \1,zpt,fail4\?
+                                bbr \1,zpt,ok4\?
+                                trap            ;bbr branch not taken
+                        fail4\? 
+                                trap            ;bbs branch taken
+                        ok4\?   
+                                tst_a $cc,$ff
+                                lda zpt
+                                cmp #$ff-(1<<\1)
+                                trap_ne         ;zp altered
+                                endm
+                        
+                                ldx #$11        ;test bbr/bbs integrity
+                                ldy #$22
+                                bbt 0
+                                bbt 1
+                                bbt 2
+                                bbt 3
+                                bbt 4
+                                bbt 5
+                                bbt 6
+                                bbt 7
+                                cpx #$11
+                                trap_ne         ;x overwritten
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   20
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                cpy #$22
+                                trap_ne         ;y overwritten
+                                next_test 
+                        
+                        bbrc    macro           ;\1 = bitnum
+                                bbr \1,zpt,skip\?
+                                eor #(1<<\1)       
+                        skip\?
+                                endm
+                        bbsc    macro           ;\1 = bitnum
+                                bbs \1,zpt,skip\?
+                                eor #(1<<\1)       
+                        skip\?
+                                endm
+                        
+                                lda #0          ;combined bit test
+                                sta zpt
+                        bbcl    lda #0
+                                bbrc 0
+                                bbrc 1
+                                bbrc 2
+                                bbrc 3
+                                bbrc 4
+                                bbrc 5
+                                bbrc 6
+                                bbrc 7
+                                eor zpt
+                                trap_ne         ;failed bbr bitnum in accu       
+                                lda #$ff
+                                bbsc 0
+                                bbsc 1
+                                bbsc 2
+                                bbsc 3
+                                bbsc 4
+                                bbsc 5
+                                bbsc 6
+                                bbsc 7
+                                eor zpt
+                                trap_ne         ;failed bbs bitnum in accu       
+                                inc zpt
+                                bne bbcl
+                                next_test            
+                            endif
+                            
+                        ; testing NOP
+                        
+                        nop_test    macro       ;\1 = opcode, \2 = # of bytes
+                                    ldy #$42
+                                    ldx #4-\2
+                                    db  \1          ;test nop length
+                                if \2 = 1
+                                    dex
+                                    dex
+                                endif
+                                if \2 = 2
+                                    iny
+                                    dex
+                                endif
+                                if \2 = 3
+                                    iny
+                                    iny
+                                endif
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   21
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                    dex
+                                    trap_ne         ;wrong number of bytes
+                                    set_a $ff-\1,0
+                                    db  \1          ;test nop integrity - flags off
+                                    nop
+                                    nop
+                                    tst_a $ff-\1,0
+                                    set_a $aa-\1,$ff
+                                    db  \1          ;test nop integrity - flags on
+                                    nop
+                                    nop
+                                    tst_a $aa-\1,$ff
+                                    cpy #$42
+                                    trap_ne         ;y changed
+                                    cpx #0
+                                    trap_ne         ;x changed
+                                    endm
+                                    
+                                nop_test $02,2
+                        
+                                nop_test $22,2
+                        
+                                nop_test $42,2
+                        
+                                nop_test $62,2
+                        
+                                nop_test $82,2
+                        
+                                nop_test $c2,2
+                        
+                                nop_test $e2,2
+                        
+                                nop_test $44,2
+                        
+                                nop_test $54,2
+                        
+                                nop_test $d4,2
+                        
+                                nop_test $f4,2
+                        
+                                nop_test $5c,3
+                        
+                                nop_test $dc,3
+                        
+                                nop_test $fc,3
+                        
+                                nop_test $03,1
+                        
+                                nop_test $13,1
+                        
+                                nop_test $23,1
+                        
+                                nop_test $33,1
+                        
+                                nop_test $43,1
+                        
+                                nop_test $53,1
+                        
+                                nop_test $63,1
+                        
+                                nop_test $73,1
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   22
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                nop_test $83,1
+                        
+                                nop_test $93,1
+                        
+                                nop_test $a3,1
+                        
+                                nop_test $b3,1
+                        
+                                nop_test $c3,1
+                        
+                                nop_test $d3,1
+                        
+                                nop_test $e3,1
+                        
+                                nop_test $f3,1
+                        
+                                nop_test $0b,1
+                        
+                                nop_test $1b,1
+                        
+                                nop_test $2b,1
+                        
+                                nop_test $3b,1
+                        
+                                nop_test $4b,1
+                        
+                                nop_test $5b,1
+                        
+                                nop_test $6b,1
+                        
+                                nop_test $7b,1
+                        
+                                nop_test $8b,1
+                        
+                                nop_test $9b,1
+                        
+                                nop_test $ab,1
+                        
+                                nop_test $bb,1
+                        
+                                nop_test $eb,1
+                        
+                                nop_test $fb,1
+                        
+                            if rkwl_wdc_op = 0      ;NOPs not available on Rockwell & WDC 65C02
+                                nop_test $07,1
+                        
+                                nop_test $17,1
+                        
+                                nop_test $27,1
+                        
+                                nop_test $37,1
+                        
+                                nop_test $47,1
+                        
+                                nop_test $57,1
+                        
+                                nop_test $67,1
+                        
+                                nop_test $77,1
+                        
+                                nop_test $87,1
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   23
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+                                nop_test $97,1
+                        
+                                nop_test $a7,1
+                        
+                                nop_test $b7,1
+                        
+                                nop_test $c7,1
+                        
+                                nop_test $d7,1
+                        
+                                nop_test $e7,1
+                        
+                                nop_test $f7,1
+                        
+                                nop_test $0f,1
+                        
+                                nop_test $1f,1
+                        
+                                nop_test $2f,1
+                        
+                                nop_test $3f,1
+                        
+                                nop_test $4f,1
+                        
+                                nop_test $5f,1
+                        
+                                nop_test $6f,1
+                        
+                                nop_test $7f,1
+                        
+                                nop_test $8f,1
+                        
+                                nop_test $9f,1
+                        
+                                nop_test $af,1
+                        
+                                nop_test $bf,1
+                        
+                                nop_test $cf,1
+                        
+                                nop_test $df,1
+                        
+                                nop_test $ef,1
+                        
+                                nop_test $ff,1
+                        
+                            endif
+                            if  wdc_op = 0          ;NOPs not available on WDC 65C02 (WAI, STP)
+                                nop_test $cb,1
+                                nop_test $db,1
+                            endif
+                                next_test
+                        
+                                    
+                        ; jump indirect (test page cross bug is fixed)
+3733 : a203                     ldx #3          ;prepare table
+3735 : bd4846           ji1     lda ji_adr,x
+3738 : 9dfd19                   sta ji_tab,x
+373b : ca                       dex
+373c : 10f7                     bpl ji1
+373e : a949                     lda #hi(ji_px) ;high address if page cross bug
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   24
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+3740 : 8d0019                   sta pg_x
+                                set_stat 0
+                        
+3747 : a949                     lda #'I'
+3749 : a24e                     ldx #'N'
+374b : a044                     ldy #'D'        ;N=0, V=0, Z=0, C=0
+374d : 6cfd19                   jmp (ji_tab)
+3750 : ea                       nop
+                                trap_ne         ;runover protection
+                        
+                        
+3756 : 88                       dey
+3757 : 88                       dey
+3758 : 08               ji_ret  php             ;either SP or Y count will fail, if we do not hit
+3759 : 88                       dey
+375a : 88                       dey
+375b : 88                       dey
+375c : 28                       plp
+                                trap_eq         ;returned flags OK?
+                        
+                                trap_pl
+                        
+                                trap_cc
+                        
+                                trap_vc
+                        
+3771 : c9e3                     cmp #('I'^$aa)  ;returned registers OK?
+                                trap_ne
+                        
+3778 : e04f                     cpx #('N'+1)
+                                trap_ne
+                        
+377f : c03e                     cpy #('D'-6)
+                                trap_ne
+                        
+3786 : ba                       tsx             ;SP check
+3787 : e0ff                     cpx #$ff
+                                trap_ne
+                        
+                                next_test
+                        
+                        
+                        ; jump indexed indirect
+379d : a20b                     ldx #11         ;prepare table
+379f : bd9946           jxi1    lda jxi_adr,x
+37a2 : 9df919                   sta jxi_tab,x
+37a5 : ca                       dex
+37a6 : 10f7                     bpl jxi1
+37a8 : a948                     lda #hi(jxi_px) ;high address if page cross bug
+37aa : 8d0019                   sta pg_x
+                                set_stat 0
+                        
+37b1 : a958                     lda #'X'
+37b3 : a204                     ldx #4
+37b5 : a049                     ldy #'I'        ;N=0, V=0, Z=0, C=0
+37b7 : 7cf919                   jmp (jxi_tab,x)
+37ba : ea                       nop
+                                trap_ne         ;runover protection
+                        
+                        
+37c0 : 88                       dey
+37c1 : 88                       dey
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   25
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+37c2 : 08               jxi_ret php             ;either SP or Y count will fail, if we do not hit
+37c3 : 88                       dey
+37c4 : 88                       dey
+37c5 : 88                       dey
+37c6 : 28                       plp
+                                trap_eq         ;returned flags OK?
+                        
+                                trap_pl
+                        
+                                trap_cc
+                        
+                                trap_vc
+                        
+37db : c9f2                     cmp #('X'^$aa)  ;returned registers OK?
+                                trap_ne
+                        
+37e2 : e006                     cpx #6
+                                trap_ne
+                        
+37e9 : c043                     cpy #('I'-6)
+                                trap_ne
+                        
+37f0 : ba                       tsx             ;SP check
+37f1 : e0ff                     cpx #$ff
+                                trap_ne
+                        
+                        
+37f8 : a914                     lda #lo(jxp_ok) ;test with index causing a page cross
+37fa : 8d001a                   sta jxp_tab
+37fd : a938                     lda #hi(jxp_ok)
+37ff : 8d011a                   sta jxp_tab+1
+3802 : a911                     lda #lo(jxp_px)
+3804 : 8d0019                   sta pg_x
+3807 : a938                     lda #hi(jxp_px)
+3809 : 8d0119                   sta pg_x+1
+380c : a2ff                     ldx #$ff
+380e : 7c0119                   jmp (jxp_tab-$ff,x)
+                                
+3811 :                  jxp_px  
+                                trap            ;page cross by index to wrong page
+                        
+                        
+3814 :                  jxp_ok
+                                next_test
+                        
+                        
+                            if ROM_vectors = 1
+                        ; test BRK clears decimal mode
+                                sed
+                                brk
+                                nop
+                        brk_ret
+                                next_test
+                            endif
+                         
+                        ; testing accumulator increment/decrement INC A & DEC A
+3823 : a2ac                     ldx #$ac    ;protect x & y
+3825 : a0dc                     ldy #$dc
+                                set_a $fe,$ff
+                        
+382d : 1a                       inc a           ;ff
+                                tst_as $ff,$ff-zero
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   26
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+3842 : 1a                       inc a           ;00
+                                tst_as 0,$ff-minus
+                        
+3857 : 1a                       inc a           ;01
+                                tst_as 1,$ff-minus-zero
+                        
+386c : 3a                       dec a           ;00
+                                tst_as 0,$ff-minus
+                        
+3881 : 3a                       dec a           ;ff
+                                tst_as $ff,$ff-zero
+                        
+3896 : 3a                       dec a           ;fe
+                                set_a $fe,0
+                        
+389d : 1a                       inc a           ;ff
+                                tst_as $ff,minus
+                        
+38b2 : 1a                       inc a           ;00
+                                tst_as 0,zero
+                        
+38c7 : 1a                       inc a           ;01
+                                tst_as 1,0
+                        
+38dc : 3a                       dec a           ;00
+                                tst_as 0,zero
+                        
+38f1 : 3a                       dec a           ;ff
+                                tst_as $ff,minus
+                        
+3906 : e0ac                     cpx #$ac
+                                trap_ne     ;x altered during test
+                        
+390d : c0dc                     cpy #$dc
+                                trap_ne     ;y altered during test
+                        
+3914 : ba                       tsx
+3915 : e0ff                     cpx #$ff
+                                trap_ne     ;sp push/pop mismatch
+                        
+                                next_test
+                        
+                        
+                        ; testing load / store accumulator LDA / STA (zp)
+392b : a299                     ldx #$99    ;protect x & y
+392d : a066                     ldy #$66
+                                set_stat 0  
+                        
+3933 : b222                     lda (ind1)
+3935 : 08                       php         ;test stores do not alter flags
+3936 : 49c3                     eor #$c3
+3938 : 28                       plp
+3939 : 922e                     sta (indt)
+393b : 08                       php         ;flags after load/store sequence
+393c : 49c3                     eor #$c3
+393e : c9c3                     cmp #$c3    ;test result
+                                trap_ne
+                        
+3945 : 68                       pla         ;load status
+                                eor_flag 0
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   27
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+3948 : cd1519                   cmp fLDx    ;test flags
+                                trap_ne
+                        
+                                set_stat 0
+                        
+3954 : b224                     lda (ind1+2)
+3956 : 08                       php         ;test stores do not alter flags
+3957 : 49c3                     eor #$c3
+3959 : 28                       plp
+395a : 9230                     sta (indt+2)
+395c : 08                       php         ;flags after load/store sequence
+395d : 49c3                     eor #$c3
+395f : c982                     cmp #$82    ;test result
+                                trap_ne
+                        
+3966 : 68                       pla         ;load status
+                                eor_flag 0
+                        
+3969 : cd1619                   cmp fLDx+1  ;test flags
+                                trap_ne
+                        
+                                set_stat 0
+                        
+3975 : b226                     lda (ind1+4)
+3977 : 08                       php         ;test stores do not alter flags
+3978 : 49c3                     eor #$c3
+397a : 28                       plp
+397b : 9232                     sta (indt+4)
+397d : 08                       php         ;flags after load/store sequence
+397e : 49c3                     eor #$c3
+3980 : c941                     cmp #$41    ;test result
+                                trap_ne
+                        
+3987 : 68                       pla         ;load status
+                                eor_flag 0
+                        
+398a : cd1719                   cmp fLDx+2  ;test flags
+                                trap_ne
+                        
+                                set_stat 0
+                        
+3996 : b228                     lda (ind1+6)
+3998 : 08                       php         ;test stores do not alter flags
+3999 : 49c3                     eor #$c3
+399b : 28                       plp
+399c : 9234                     sta (indt+6)
+399e : 08                       php         ;flags after load/store sequence
+399f : 49c3                     eor #$c3
+39a1 : c900                     cmp #0      ;test result
+                                trap_ne
+                        
+39a8 : 68                       pla         ;load status
+                                eor_flag 0
+                        
+39ab : cd1819                   cmp fLDx+3  ;test flags
+                                trap_ne
+                        
+39b3 : e099                     cpx #$99
+                                trap_ne     ;x altered during test
+                        
+39ba : c066                     cpy #$66
+                                trap_ne     ;y altered during test
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   28
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+                        
+39c1 : a003                     ldy #3      ;testing store result
+39c3 : a200                     ldx #0
+39c5 : b90519           tstai1  lda abst,y
+39c8 : 49c3                     eor #$c3
+39ca : d91019                   cmp abs1,y
+                                trap_ne     ;store to indirect data
+                        
+39d2 : 8a                       txa
+39d3 : 990519                   sta abst,y  ;clear                
+39d6 : 88                       dey
+39d7 : 10ec                     bpl tstai1
+                        
+39d9 : a299                     ldx #$99    ;protect x & y
+39db : a066                     ldy #$66
+                                set_stat $ff  
+                        
+39e1 : b222                     lda (ind1)
+39e3 : 08                       php         ;test stores do not alter flags
+39e4 : 49c3                     eor #$c3
+39e6 : 28                       plp
+39e7 : 922e                     sta (indt)
+39e9 : 08                       php         ;flags after load/store sequence
+39ea : 49c3                     eor #$c3
+39ec : c9c3                     cmp #$c3    ;test result
+                                trap_ne
+                        
+39f3 : 68                       pla         ;load status
+                                eor_flag lo~fnz ;mask bits not altered
+                        
+39f6 : cd1519                   cmp fLDx    ;test flags
+                                trap_ne
+                        
+                                set_stat $ff
+                        
+3a02 : b224                     lda (ind1+2)
+3a04 : 08                       php         ;test stores do not alter flags
+3a05 : 49c3                     eor #$c3
+3a07 : 28                       plp
+3a08 : 9230                     sta (indt+2)
+3a0a : 08                       php         ;flags after load/store sequence
+3a0b : 49c3                     eor #$c3
+3a0d : c982                     cmp #$82    ;test result
+                                trap_ne
+                        
+3a14 : 68                       pla         ;load status
+                                eor_flag lo~fnz ;mask bits not altered
+                        
+3a17 : cd1619                   cmp fLDx+1  ;test flags
+                                trap_ne
+                        
+                                set_stat $ff
+                        
+3a23 : b226                     lda (ind1+4)
+3a25 : 08                       php         ;test stores do not alter flags
+3a26 : 49c3                     eor #$c3
+3a28 : 28                       plp
+3a29 : 9232                     sta (indt+4)
+3a2b : 08                       php         ;flags after load/store sequence
+3a2c : 49c3                     eor #$c3
+3a2e : c941                     cmp #$41    ;test result
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   29
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                trap_ne
+                        
+3a35 : 68                       pla         ;load status
+                                eor_flag lo~fnz ;mask bits not altered
+                        
+3a38 : cd1719                   cmp fLDx+2  ;test flags
+                                trap_ne
+                        
+                                set_stat $ff
+                        
+3a44 : b228                     lda (ind1+6)
+3a46 : 08                       php         ;test stores do not alter flags
+3a47 : 49c3                     eor #$c3
+3a49 : 28                       plp
+3a4a : 9234                     sta (indt+6)
+3a4c : 08                       php         ;flags after load/store sequence
+3a4d : 49c3                     eor #$c3
+3a4f : c900                     cmp #0      ;test result
+                                trap_ne
+                        
+3a56 : 68                       pla         ;load status
+                                eor_flag lo~fnz ;mask bits not altered
+                        
+3a59 : cd1819                   cmp fLDx+3  ;test flags
+                                trap_ne
+                        
+3a61 : e099                     cpx #$99
+                                trap_ne     ;x altered during test
+                        
+3a68 : c066                     cpy #$66
+                                trap_ne     ;y altered during test
+                        
+                        
+3a6f : a003                     ldy #3      ;testing store result
+3a71 : a200                     ldx #0
+3a73 : b90519           tstai2  lda abst,y
+3a76 : 49c3                     eor #$c3
+3a78 : d91019                   cmp abs1,y
+                                trap_ne     ;store to indirect data
+                        
+3a80 : 8a                       txa
+3a81 : 990519                   sta abst,y  ;clear                
+3a84 : 88                       dey
+3a85 : 10ec                     bpl tstai2
+3a87 : ba                       tsx
+3a88 : e0ff                     cpx #$ff
+                                trap_ne     ;sp push/pop mismatch
+                        
+                                next_test
+                        
+                        
+                        ; testing STZ - zp / abs / zp,x / abs,x
+3a9e : a07b                     ldy #123    ;protect y
+3aa0 : a204                     ldx #4      ;precharge test area
+3aa2 : a907                     lda #7
+3aa4 : 950a             tstz1   sta zpt,x
+3aa6 : 0a                       asl a
+3aa7 : ca                       dex
+3aa8 : 10fa                     bpl tstz1
+3aaa : a204                     ldx #4
+                                set_a $55,$ff
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   30
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+3ab2 : 640a                     stz zpt     
+3ab4 : 640b                     stz zpt+1
+3ab6 : 640c                     stz zpt+2
+3ab8 : 640d                     stz zpt+3
+3aba : 640e                     stz zpt+4
+                                tst_a $55,$ff
+                        
+3ace : b50a             tstz2   lda zpt,x   ;verify zeros stored
+                                trap_ne     ;non zero after STZ zp
+                        
+3ad5 : ca                       dex
+3ad6 : 10f6                     bpl tstz2
+3ad8 : a204                     ldx #4      ;precharge test area
+3ada : a907                     lda #7
+3adc : 950a             tstz3   sta zpt,x
+3ade : 0a                       asl a
+3adf : ca                       dex
+3ae0 : 10fa                     bpl tstz3
+3ae2 : a204                     ldx #4
+                                set_a $aa,0
+                        
+3aea : 640a                     stz zpt     
+3aec : 640b                     stz zpt+1
+3aee : 640c                     stz zpt+2
+3af0 : 640d                     stz zpt+3
+3af2 : 640e                     stz zpt+4
+                                tst_a $aa,0
+                        
+3b06 : b50a             tstz4   lda zpt,x   ;verify zeros stored
+                                trap_ne     ;non zero after STZ zp
+                        
+3b0d : ca                       dex
+3b0e : 10f6                     bpl tstz4
+                                
+3b10 : a204                     ldx #4      ;precharge test area
+3b12 : a907                     lda #7
+3b14 : 9d0519           tstz5   sta abst,x
+3b17 : 0a                       asl a
+3b18 : ca                       dex
+3b19 : 10f9                     bpl tstz5
+3b1b : a204                     ldx #4
+                                set_a $55,$ff
+                        
+3b23 : 9c0519                   stz abst     
+3b26 : 9c0619                   stz abst+1
+3b29 : 9c0719                   stz abst+2
+3b2c : 9c0819                   stz abst+3
+3b2f : 9c0919                   stz abst+4
+                                tst_a $55,$ff
+                        
+3b44 : bd0519           tstz6   lda abst,x   ;verify zeros stored
+                                trap_ne     ;non zero after STZ abs
+                        
+3b4c : ca                       dex
+3b4d : 10f5                     bpl tstz6
+3b4f : a204                     ldx #4      ;precharge test area
+3b51 : a907                     lda #7
+3b53 : 9d0519           tstz7   sta abst,x
+3b56 : 0a                       asl a
+3b57 : ca                       dex
+3b58 : 10f9                     bpl tstz7
+3b5a : a204                     ldx #4
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   31
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                set_a $aa,0
+                        
+3b62 : 9c0519                   stz abst     
+3b65 : 9c0619                   stz abst+1
+3b68 : 9c0719                   stz abst+2
+3b6b : 9c0819                   stz abst+3
+3b6e : 9c0919                   stz abst+4
+                                tst_a $aa,0
+                        
+3b83 : bd0519           tstz8   lda abst,x   ;verify zeros stored
+                                trap_ne     ;non zero after STZ abs
+                        
+3b8b : ca                       dex
+3b8c : 10f5                     bpl tstz8
+                                
+3b8e : a204                     ldx #4      ;precharge test area
+3b90 : a907                     lda #7
+3b92 : 950a             tstz11  sta zpt,x
+3b94 : 0a                       asl a
+3b95 : ca                       dex
+3b96 : 10fa                     bpl tstz11
+3b98 : a204                     ldx #4
+3b9a :                  tstz15
+                                set_a $55,$ff
+                        
+3ba0 : 740a                     stz zpt,x     
+                                tst_a $55,$ff
+                        
+3bb4 : ca                       dex
+3bb5 : 10e3                     bpl tstz15
+3bb7 : a204                     ldx #4
+3bb9 : b50a             tstz12  lda zpt,x   ;verify zeros stored
+                                trap_ne     ;non zero after STZ zp
+                        
+3bc0 : ca                       dex
+3bc1 : 10f6                     bpl tstz12
+3bc3 : a204                     ldx #4      ;precharge test area
+3bc5 : a907                     lda #7
+3bc7 : 950a             tstz13  sta zpt,x
+3bc9 : 0a                       asl a
+3bca : ca                       dex
+3bcb : 10fa                     bpl tstz13
+3bcd : a204                     ldx #4
+3bcf :                  tstz16
+                                set_a $aa,0
+                        
+3bd5 : 740a                     stz zpt,x
+                                tst_a $aa,0
+                        
+3be9 : ca                       dex
+3bea : 10e3                     bpl tstz16
+3bec : a204                     ldx #4
+3bee : b50a             tstz14  lda zpt,x   ;verify zeros stored
+                                trap_ne     ;non zero after STZ zp
+                        
+3bf5 : ca                       dex
+3bf6 : 10f6                     bpl tstz14
+                                
+3bf8 : a204                     ldx #4      ;precharge test area
+3bfa : a907                     lda #7
+3bfc : 9d0519           tstz21  sta abst,x
+3bff : 0a                       asl a
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   32
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+3c00 : ca                       dex
+3c01 : 10f9                     bpl tstz21
+3c03 : a204                     ldx #4
+3c05 :                  tstz25
+                                set_a $55,$ff
+                        
+3c0b : 9e0519                   stz abst,x     
+                                tst_a $55,$ff
+                        
+3c20 : ca                       dex
+3c21 : 10e2                     bpl tstz25
+3c23 : a204                     ldx #4
+3c25 : bd0519           tstz22  lda abst,x   ;verify zeros stored
+                                trap_ne     ;non zero after STZ zp
+                        
+3c2d : ca                       dex
+3c2e : 10f5                     bpl tstz22
+3c30 : a204                     ldx #4      ;precharge test area
+3c32 : a907                     lda #7
+3c34 : 9d0519           tstz23  sta abst,x
+3c37 : 0a                       asl a
+3c38 : ca                       dex
+3c39 : 10f9                     bpl tstz23
+3c3b : a204                     ldx #4
+3c3d :                  tstz26
+                                set_a $aa,0
+                        
+3c43 : 9e0519                   stz abst,x
+                                tst_a $aa,0
+                        
+3c58 : ca                       dex
+3c59 : 10e2                     bpl tstz26
+3c5b : a204                     ldx #4
+3c5d : bd0519           tstz24  lda abst,x   ;verify zeros stored
+                                trap_ne     ;non zero after STZ zp
+                        
+3c65 : ca                       dex
+3c66 : 10f5                     bpl tstz24
+                                
+3c68 : c07b                     cpy #123
+                                trap_ne     ;y altered during test 
+                        
+3c6f : ba                       tsx
+3c70 : e0ff                     cpx #$ff
+                                trap_ne     ;sp push/pop mismatch
+                        
+                                next_test
+                        
+                        
+                        ; testing BIT - zp,x / abs,x / #
+3c86 : a042                     ldy #$42
+3c88 : a203                     ldx #3
+                                set_a $ff,0
+                        
+3c90 : 3411                     bit zp1,x   ;00 - should set Z / clear  NV
+                                tst_a $ff,fz 
+                        
+3ca4 : ca                       dex
+                                set_a 1,0
+                        
+3cab : 3411                     bit zp1,x   ;41 - should set V (M6) / clear NZ
+                                tst_a 1,fv
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   33
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+3cbf : ca                       dex
+                                set_a 1,0
+                        
+3cc6 : 3411                     bit zp1,x   ;82 - should set N (M7) & Z / clear V
+                                tst_a 1,fnz
+                        
+3cda : ca                       dex
+                                set_a 1,0
+                        
+3ce1 : 3411                     bit zp1,x   ;c3 - should set N (M7) & V (M6) / clear Z
+                                tst_a 1,fnv
+                        
+                                
+                                set_a 1,$ff
+                        
+3cfb : 3411                     bit zp1,x   ;c3 - should set N (M7) & V (M6) / clear Z
+                                tst_a 1,~fz
+                        
+3d0f : e8                       inx
+                                set_a 1,$ff
+                        
+3d16 : 3411                     bit zp1,x   ;82 - should set N (M7) & Z / clear V
+                                tst_a 1,~fv
+                        
+3d2a : e8                       inx
+                                set_a 1,$ff
+                        
+3d31 : 3411                     bit zp1,x   ;41 - should set V (M6) / clear NZ
+                                tst_a 1,~fnz
+                        
+3d45 : e8                       inx
+                                set_a $ff,$ff
+                        
+3d4c : 3411                     bit zp1,x   ;00 - should set Z / clear  NV
+                                tst_a $ff,~fnv 
+                        
+                                
+                                set_a $ff,0
+                        
+3d66 : 3c1019                   bit abs1,x  ;00 - should set Z / clear  NV
+                                tst_a $ff,fz 
+                        
+3d7b : ca                       dex
+                                set_a 1,0
+                        
+3d82 : 3c1019                   bit abs1,x  ;41 - should set V (M6) / clear NZ
+                                tst_a 1,fv
+                        
+3d97 : ca                       dex
+                                set_a 1,0
+                        
+3d9e : 3c1019                   bit abs1,x  ;82 - should set N (M7) & Z / clear V
+                                tst_a 1,fnz
+                        
+3db3 : ca                       dex
+                                set_a 1,0
+                        
+3dba : 3c1019                   bit abs1,x  ;c3 - should set N (M7) & V (M6) / clear Z
+                                tst_a 1,fnv
+                        
+                                
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   34
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                set_a 1,$ff
+                        
+3dd5 : 3c1019                   bit abs1,x  ;c3 - should set N (M7) & V (M6) / clear Z
+                                tst_a 1,~fz
+                        
+3dea : e8                       inx
+                                set_a 1,$ff
+                        
+3df1 : 3c1019                   bit abs1,x  ;82 - should set N (M7) & Z / clear V
+                                tst_a 1,~fv
+                        
+3e06 : e8                       inx
+                                set_a 1,$ff
+                        
+3e0d : 3c1019                   bit abs1,x  ;41 - should set V (M6) / clear NZ
+                                tst_a 1,~fnz
+                        
+3e22 : e8                       inx
+                                set_a $ff,$ff
+                        
+3e29 : 3c1019                   bit abs1,x  ;00 - should set Z / clear  NV
+                                tst_a $ff,~fnv 
+                        
+                                
+                                set_a $ff,0
+                        
+3e44 : 8900                     bit #$00    ;00 - should set Z
+                                tst_a $ff,fz 
+                        
+3e58 : ca                       dex
+                                set_a 1,0
+                        
+3e5f : 8941                     bit #$41    ;41 - should clear Z
+                                tst_a 1,0
+                        
+                        ; *** DEBUG INFO ***
+                        ; if it fails the previous test and your BIT # has set the V flag
+                        ; see http://forum.6502.org/viewtopic.php?f=2&t=2241&p=27243#p27239
+                        ; why it shouldn't alter N or V flags on a BIT #
+3e73 : ca                       dex
+                                set_a 1,0
+                        
+3e7a : 8982                     bit #$82    ;82 - should set Z
+                                tst_a 1,fz
+                        
+3e8e : ca                       dex
+                                set_a 1,0
+                        
+3e95 : 89c3                     bit #$c3    ;c3 - should clear Z
+                                tst_a 1,0
+                        
+                                
+                                set_a 1,$ff
+                        
+3eaf : 89c3                     bit #$c3    ;c3 - clear Z
+                                tst_a 1,~fz
+                        
+3ec3 : e8                       inx
+                                set_a 1,$ff
+                        
+3eca : 8982                     bit #$82    ;82 - should set Z
+                                tst_a 1,$ff
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   35
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+3ede : e8                       inx
+                                set_a 1,$ff
+                        
+3ee5 : 8941                     bit #$41    ;41 - should clear Z
+                                tst_a 1,~fz
+                        
+3ef9 : e8                       inx
+                                set_a $ff,$ff
+                        
+3f00 : 8900                     bit #$00   ;00 - should set Z
+                                tst_a $ff,$ff
+                        
+                                
+3f14 : e003                     cpx #3
+                                trap_ne     ;x altered during test
+                        
+3f1b : c042                     cpy #$42
+                                trap_ne     ;y altered during test 
+                        
+3f22 : ba                       tsx
+3f23 : e0ff                     cpx #$ff
+                                trap_ne     ;sp push/pop mismatch
+                        
+                                next_test
+                        
+                        
+                        ; testing TRB, TSB - zp / abs
+                        
+                        trbt    macro       ;\1 = memory, \2 = flags   
+                                sty \1
+                                load_flag \2
+                                pha
+                                lda zpt+1
+                                plp
+                                trb \1
+                                php
+                                cmp zpt+1
+                                trap_ne     ;accu was changed
+                                pla
+                                pha
+                                ora #fz     ;mask Z
+                                cmp_flag \2|fz
+                                trap_ne     ;flags changed except Z
+                                pla
+                                and #fz
+                                cmp zpt+2
+                                trap_ne     ;Z flag invalid
+                                lda zpt+3
+                                cmp zpt
+                                trap_ne     ;altered bits in memory wrong       
+                                endm
+                        
+                        tsbt    macro       ;\1 = memory, \2 = flags   
+                                sty \1
+                                load_flag \2
+                                pha
+                                lda zpt+1
+                                plp
+                                tsb \1
+                                php
+                                cmp zpt+1
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   36
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                trap_ne     ;accu was changed
+                                pla
+                                pha
+                                ora #fz     ;mask Z
+                                cmp_flag \2|fz
+                                trap_ne     ;flags changed except Z
+                                pla
+                                and #fz
+                                cmp zpt+2
+                                trap_ne     ;Z flag invalid
+                                lda zpt+4
+                                cmp zpt
+                                trap_ne     ;altered bits in memory wrong        
+                                endm
+                        
+3f39 : a2c0                     ldx #$c0
+3f3b : a000                     ldy #0      ;op1 - memory save
+                                ;   zpt     ;op1 - memory modifiable
+3f3d : 640b                     stz zpt+1   ;op2 - accu
+                                ;   zpt+2   ;and flags
+                                ;   zpt+3   ;memory after reset
+                                ;   zpt+4   ;memory after set
+                                
+3f3f : 98               tbt1    tya
+3f40 : 250b                     and zpt+1   ;set Z by anding the 2 operands
+3f42 : 08                       php
+3f43 : 68                       pla
+3f44 : 2902                     and #fz     ;mask Z
+3f46 : 850c                     sta zpt+2
+3f48 : 98                       tya         ;reset op1 bits by op2
+3f49 : 49ff                     eor #$ff
+3f4b : 050b                     ora zpt+1
+3f4d : 49ff                     eor #$ff
+3f4f : 850d                     sta zpt+3
+3f51 : 98                       tya         ;set op1 bits by op2
+3f52 : 050b                     ora zpt+1
+3f54 : 850e                     sta zpt+4
+                        
+                                trbt zpt,$ff
+                        
+                                trbt abst,$ff
+                        
+                                trbt zpt,0
+                        
+                                trbt abst,0
+                        
+                                tsbt zpt,$ff
+                        
+                                tsbt abst,$ff
+                        
+                                tsbt zpt,0
+                        
+                                tsbt abst,0
+                        
+                                
+40de : c8                       iny         ;iterate op1
+40df : d004                     bne tbt3
+40e1 : e60b                     inc zpt+1   ;iterate op2
+40e3 : f003                     beq tbt2
+40e5 : 4c3f3f           tbt3    jmp tbt1        
+40e8 :                  tbt2
+40e8 : e0c0                     cpx #$c0
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   37
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                trap_ne     ;x altered during test
+                        
+40ef : ba                       tsx
+40f0 : e0ff                     cpx #$ff
+                                trap_ne     ;sp push/pop mismatch
+                        
+                                next_test    
+                        
+                        
+                            if rkwl_wdc_op = 1
+                        ; testing RMB, SMB - zp
+                        rmbt    macro       ;\1 = bitnum
+                                lda #$ff
+                                sta zpt
+                                set_a $a5,0
+                                rmb \1,zpt
+                                tst_a $a5,0
+                                lda zpt
+                                cmp #$ff-(1<<\1)
+                                trap_ne     ;wrong bits set or cleared
+                                lda #1<<\1
+                                sta zpt
+                                set_a $5a,$ff
+                                rmb \1,zpt
+                                tst_a $5a,$ff
+                                lda zpt
+                                trap_ne     ;wrong bits set or cleared
+                                endm
+                        smbt    macro       ;\1 = bitnum
+                                lda #$ff-(1<<\1)
+                                sta zpt
+                                set_a $a5,0
+                                smb \1,zpt
+                                tst_a $a5,0
+                                lda zpt
+                                cmp #$ff
+                                trap_ne     ;wrong bits set or cleared
+                                lda #0
+                                sta zpt
+                                set_a $5a,$ff
+                                smb \1,zpt
+                                tst_a $5a,$ff
+                                lda zpt
+                                cmp #1<<\1
+                                trap_ne     ;wrong bits set or cleared
+                                endm
+                        
+                                ldx #$ba    ;protect x & y
+                                ldy #$d0
+                                rmbt 0
+                                rmbt 1
+                                rmbt 2
+                                rmbt 3
+                                rmbt 4
+                                rmbt 5
+                                rmbt 6
+                                rmbt 7
+                                smbt 0
+                                smbt 1
+                                smbt 2
+                                smbt 3
+                                smbt 4
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   38
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                smbt 5
+                                smbt 6
+                                smbt 7
+                                cpx #$ba
+                                trap_ne     ;x altered during test
+                                cpy #$d0
+                                trap_ne     ;y altered during test
+                                tsx
+                                cpx #$ff
+                                trap_ne     ;sp push/pop mismatch
+                                next_test
+                            endif        
+                                 
+                        ; testing CMP - (zp)         
+4106 : a2de                     ldx #$de    ;protect x & y
+4108 : a0ad                     ldy #$ad
+                                set_a $80,0
+                        
+4110 : d22a                     cmp (ind1+8)
+                                tst_a $80,fc
+                        
+                                set_a $7f,0
+                        
+412a : d22a                     cmp (ind1+8)
+                                tst_a $7f,fzc
+                        
+                                set_a $7e,0
+                        
+4144 : d22a                     cmp (ind1+8)
+                                tst_a $7e,fn
+                        
+                                set_a $80,$ff
+                        
+415e : d22a                     cmp (ind1+8)
+                                tst_a $80,~fnz
+                        
+                                set_a $7f,$ff
+                        
+4178 : d22a                     cmp (ind1+8)
+                                tst_a $7f,~fn
+                        
+                                set_a $7e,$ff
+                        
+4192 : d22a                     cmp (ind1+8)
+                                tst_a $7e,~fzc
+                        
+41a6 : e0de                     cpx #$de
+                                trap_ne     ;x altered during test
+                        
+41ad : c0ad                     cpy #$ad
+                                trap_ne     ;y altered during test 
+                        
+41b4 : ba                       tsx
+41b5 : e0ff                     cpx #$ff
+                                trap_ne     ;sp push/pop mismatch
+                        
+                                next_test
+                        
+                        
+                        ; testing logical instructions - AND EOR ORA (zp)
+41cb : a242                     ldx #$42    ;protect x & y
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   39
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+41cd : a000                     ldy #0      ;AND
+41cf : a538                     lda indAN   ;set indirect address
+41d1 : 850a                     sta zpt
+41d3 : a539                     lda indAN+1
+41d5 : 850b                     sta zpt+1
+41d7 :                  tand1
+                                set_ay  absANa,0
+                        
+41de : 320a                     and (zpt)
+                                tst_ay  absrlo,absflo,0
+                        
+41f4 : e60a                     inc zpt
+41f6 : c8                       iny
+41f7 : c004                     cpy #4
+41f9 : d0dc                     bne tand1
+41fb : 88                       dey
+41fc : c60a                     dec zpt
+41fe :                  tand2
+                                set_ay  absANa,$ff
+                        
+4205 : 320a                     and (zpt)
+                                tst_ay  absrlo,absflo,$ff-fnz
+                        
+421b : c60a                     dec zpt
+421d : 88                       dey
+421e : 10de                     bpl tand2
+                        
+4220 : a000                     ldy #0      ;EOR
+4222 : a540                     lda indEO   ;set indirect address
+4224 : 850a                     sta zpt
+4226 : a541                     lda indEO+1
+4228 : 850b                     sta zpt+1
+422a :                  teor1
+                                set_ay  absEOa,0
+                        
+4231 : 520a                     eor (zpt)
+                                tst_ay  absrlo,absflo,0
+                        
+4247 : e60a                     inc zpt
+4249 : c8                       iny
+424a : c004                     cpy #4
+424c : d0dc                     bne teor1
+424e : 88                       dey
+424f : c60a                     dec zpt
+4251 :                  teor2
+                                set_ay  absEOa,$ff
+                        
+4258 : 520a                     eor (zpt)
+                                tst_ay  absrlo,absflo,$ff-fnz
+                        
+426e : c60a                     dec zpt
+4270 : 88                       dey
+4271 : 10de                     bpl teor2
+                        
+4273 : a000                     ldy #0      ;ORA
+4275 : a548                     lda indOR   ;set indirect address
+4277 : 850a                     sta zpt
+4279 : a549                     lda indOR+1
+427b : 850b                     sta zpt+1
+427d :                  tora1
+                                set_ay  absORa,0
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   40
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+4284 : 120a                     ora (zpt)
+                                tst_ay  absrlo,absflo,0
+                        
+429a : e60a                     inc zpt
+429c : c8                       iny
+429d : c004                     cpy #4
+429f : d0dc                     bne tora1
+42a1 : 88                       dey
+42a2 : c60a                     dec zpt
+42a4 :                  tora2
+                                set_ay  absORa,$ff
+                        
+42ab : 120a                     ora (zpt)
+                                tst_ay  absrlo,absflo,$ff-fnz
+                        
+42c1 : c60a                     dec zpt
+42c3 : 88                       dey
+42c4 : 10de                     bpl tora2
+                        
+42c6 : e042                     cpx #$42
+                                trap_ne     ;x altered during test
+                        
+42cd : ba                       tsx
+42ce : e0ff                     cpx #$ff
+                                trap_ne     ;sp push/pop mismatch
+                        
+                                next_test
+                        
+                                
+                            if I_flag = 3
+42e4 : 58                       cli
+                            endif                
+                        
+                        ; full binary add/subtract test - (zp) only
+                        ; iterates through all combinations of operands and carry input
+                        ; uses increments/decrements to predict result & result flags
+42e5 : d8                       cld
+42e6 : a20c                     ldx #ad2        ;for indexed test
+42e8 : a0ff                     ldy #$ff        ;max range
+42ea : a900                     lda #0          ;start with adding zeroes & no carry
+42ec : 850a                     sta adfc        ;carry in - for diag
+42ee : 850b                     sta ad1         ;operand 1 - accumulator
+42f0 : 850c                     sta ad2         ;operand 2 - memory or immediate
+42f2 : 8d0519                   sta ada2        ;non zp
+42f5 : 850d                     sta adrl        ;expected result bits 0-7
+42f7 : 850e                     sta adrh        ;expected result bit 8 (carry out)
+42f9 : a9ff                     lda #$ff        ;complemented operand 2 for subtract
+42fb : 8510                     sta sb2
+42fd : 8d0619                   sta sba2        ;non zp
+4300 : a902                     lda #2          ;expected Z-flag
+4302 : 850f                     sta adrf
+4304 : 18               tadd    clc             ;test with carry clear
+4305 : 20ff45                   jsr chkadd
+4308 : e60a                     inc adfc        ;now with carry
+430a : e60d                     inc adrl        ;result +1
+430c : 08                       php             ;save N & Z from low result
+430d : 08                       php
+430e : 68                       pla             ;accu holds expected flags
+430f : 2982                     and #$82        ;mask N & Z
+4311 : 28                       plp
+4312 : d002                     bne tadd1
+4314 : e60e                     inc adrh        ;result bit 8 - carry
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   41
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+4316 : 050e             tadd1   ora adrh        ;merge C to expected flags
+4318 : 850f                     sta adrf        ;save expected flags except overflow
+431a : 38                       sec             ;test with carry set
+431b : 20ff45                   jsr chkadd
+431e : c60a                     dec adfc        ;same for operand +1 but no carry
+4320 : e60b                     inc ad1
+4322 : d0e0                     bne tadd        ;iterate op1
+4324 : a900                     lda #0          ;preset result to op2 when op1 = 0
+4326 : 850e                     sta adrh
+4328 : ee0519                   inc ada2
+432b : e60c                     inc ad2
+432d : 08                       php             ;save NZ as operand 2 becomes the new result
+432e : 68                       pla
+432f : 2982                     and #$82        ;mask N00000Z0
+4331 : 850f                     sta adrf        ;no need to check carry as we are adding to 0
+4333 : c610                     dec sb2         ;complement subtract operand 2
+4335 : ce0619                   dec sba2
+4338 : a50c                     lda ad2         
+433a : 850d                     sta adrl
+433c : d0c6                     bne tadd        ;iterate op2
+                        
+433e : e00c                     cpx #ad2
+                                trap_ne         ;x altered during test
+                        
+4345 : c0ff                     cpy #$ff
+                                trap_ne         ;y altered during test 
+                        
+434c : ba                       tsx
+434d : e0ff                     cpx #$ff
+                                trap_ne         ;sp push/pop mismatch
+                        
+                                next_test
+                        
+                        
+                        ; decimal add/subtract test
+                        ; *** WARNING - tests documented behavior only! ***
+                        ;   only valid BCD operands are tested, the V flag is ignored
+                        ;   although V is declared as beeing valid on the 65C02 it has absolutely
+                        ;   no use in BCD math. No sign = no overflow!
+                        ; iterates through all valid combinations of operands and carry input
+                        ; uses increments/decrements to predict result & carry flag
+4363 : f8                       sed 
+4364 : a20c                     ldx #ad2        ;for indexed test
+4366 : a0ff                     ldy #$ff        ;max range
+4368 : a999                     lda #$99        ;start with adding 99 to 99 with carry
+436a : 850b                     sta ad1         ;operand 1 - accumulator
+436c : 850c                     sta ad2         ;operand 2 - memory or immediate
+436e : 8d0519                   sta ada2        ;non zp
+4371 : 850d                     sta adrl        ;expected result bits 0-7
+4373 : a901                     lda #1          ;set carry in & out
+4375 : 850a                     sta adfc        ;carry in - for diag
+4377 : 850e                     sta adrh        ;expected result bit 8 (carry out)
+4379 : a981                     lda #$81        ;set N & C (99 + 99 + C = 99 + C)
+437b : 850f                     sta adrf
+437d : a900                     lda #0          ;complemented operand 2 for subtract
+437f : 8510                     sta sb2
+4381 : 8d0619                   sta sba2        ;non zp
+4384 : 38               tdad    sec             ;test with carry set
+4385 : 203c44                   jsr chkdad
+4388 : c60a                     dec adfc        ;now with carry clear
+438a : a50d                     lda adrl        ;decimal adjust result
+438c : d008                     bne tdad1       ;skip clear carry & preset result 99 (9A-1)
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   42
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+438e : c60e                     dec adrh
+4390 : a999                     lda #$99
+4392 : 850d                     sta adrl
+4394 : d012                     bne tdad3
+4396 : 290f             tdad1   and #$f         ;lower nibble mask
+4398 : d00c                     bne tdad2       ;no decimal adjust needed
+439a : c60d                     dec adrl        ;decimal adjust (?0-6)
+439c : c60d                     dec adrl
+439e : c60d                     dec adrl
+43a0 : c60d                     dec adrl
+43a2 : c60d                     dec adrl
+43a4 : c60d                     dec adrl
+43a6 : c60d             tdad2   dec adrl        ;result -1
+43a8 : 08               tdad3   php             ;save valid flags
+43a9 : 68                       pla
+43aa : 2982                     and #$82        ;N-----Z-
+43ac : 050e                     ora adrh        ;N-----ZC
+43ae : 850f                     sta adrf
+43b0 : 18                       clc             ;test with carry clear
+43b1 : 203c44                   jsr chkdad
+43b4 : e60a                     inc adfc        ;same for operand -1 but with carry
+43b6 : a50b                     lda ad1         ;decimal adjust operand 1
+43b8 : f015                     beq tdad5       ;iterate operand 2
+43ba : 290f                     and #$f         ;lower nibble mask
+43bc : d00c                     bne tdad4       ;skip decimal adjust
+43be : c60b                     dec ad1         ;decimal adjust (?0-6)
+43c0 : c60b                     dec ad1
+43c2 : c60b                     dec ad1
+43c4 : c60b                     dec ad1
+43c6 : c60b                     dec ad1
+43c8 : c60b                     dec ad1
+43ca : c60b             tdad4   dec ad1         ;operand 1 -1
+43cc : 4c8443                   jmp tdad        ;iterate op1
+                        
+43cf : a999             tdad5   lda #$99        ;precharge op1 max
+43d1 : 850b                     sta ad1
+43d3 : a50c                     lda ad2         ;decimal adjust operand 2
+43d5 : f039                     beq tdad7       ;end of iteration
+43d7 : 290f                     and #$f         ;lower nibble mask
+43d9 : d018                     bne tdad6       ;skip decimal adjust
+43db : c60c                     dec ad2         ;decimal adjust (?0-6)
+43dd : c60c                     dec ad2
+43df : c60c                     dec ad2
+43e1 : c60c                     dec ad2
+43e3 : c60c                     dec ad2
+43e5 : c60c                     dec ad2
+43e7 : e610                     inc sb2         ;complemented decimal adjust for subtract (?9+6)
+43e9 : e610                     inc sb2
+43eb : e610                     inc sb2
+43ed : e610                     inc sb2
+43ef : e610                     inc sb2
+43f1 : e610                     inc sb2
+43f3 : c60c             tdad6   dec ad2         ;operand 2 -1
+43f5 : e610                     inc sb2         ;complemented operand for subtract
+43f7 : a510                     lda sb2
+43f9 : 8d0619                   sta sba2        ;copy as non zp operand
+43fc : a50c                     lda ad2
+43fe : 8d0519                   sta ada2        ;copy as non zp operand
+4401 : 850d                     sta adrl        ;new result since op1+carry=00+carry +op2=op2
+4403 : 08                       php             ;save flags
+4404 : 68                       pla
+4405 : 2982                     and #$82        ;N-----Z-
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   43
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+4407 : 0901                     ora #1          ;N-----ZC
+4409 : 850f                     sta adrf
+440b : e60e                     inc adrh        ;result carry
+440d : 4c8443                   jmp tdad        ;iterate op2
+                        
+4410 : e00c             tdad7   cpx #ad2
+                                trap_ne         ;x altered during test
+                        
+4417 : c0ff                     cpy #$ff
+                                trap_ne         ;y altered during test 
+                        
+441e : ba                       tsx
+441f : e0ff                     cpx #$ff
+                                trap_ne         ;sp push/pop mismatch
+                        
+4426 : d8                       cld
+                        
+4427 : ad0219                   lda test_case
+442a : c911                     cmp #test_num
+                                trap_ne         ;previous test is out of sequence
+                        
+4431 : a9f0                     lda #$f0        ;mark opcode testing complete
+4433 : 8d0219                   sta test_case
+                        
+                        ; final RAM integrity test
+                        ;   verifies that none of the previous tests has altered RAM outside of the
+                        ;   designated write areas.
+                                check_ram
+                        
+                        ; *** DEBUG INFO ***
+                        ; to debug checksum errors uncomment check_ram in the next_test macro to 
+                        ; narrow down the responsible opcode.
+                        ; may give false errors when monitor, OS or other background activity is
+                        ; allowed during previous tests.
+                        
+                        
+                        ; S U C C E S S ************************************************       
+                        ; -------------       
+                                success         ;if you get here everything went well
+                        
+                        ; -------------       
+                        ; S U C C E S S ************************************************       
+4439 : 4c001b                   jmp start       ;run again      
+                        
+                        ; core subroutine of the decimal add/subtract test
+                        ; *** WARNING - tests documented behavior only! ***
+                        ;   only valid BCD operands are tested, V flag is ignored
+                        ; iterates through all valid combinations of operands and carry input
+                        ; uses increments/decrements to predict result & carry flag
+443c :                  chkdad
+                        ; decimal ADC / SBC zp
+443c : 08                       php             ;save carry for subtract
+443d : a50b                     lda ad1
+443f : 650c                     adc ad2         ;perform add
+4441 : 08                       php          
+4442 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+4449 : 68                       pla             ;check flags
+444a : 2983                     and #$83        ;mask N-----ZC
+444c : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   44
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        
+4453 : 28                       plp
+4454 : 08                       php             ;save carry for next add
+4455 : a50b                     lda ad1
+4457 : e510                     sbc sb2         ;perform subtract
+4459 : 08                       php          
+445a : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+4461 : 68                       pla             ;check flags
+4462 : 2983                     and #$83        ;mask N-----ZC
+4464 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+446b : 28                       plp
+                        ; decimal ADC / SBC abs
+446c : 08                       php             ;save carry for subtract
+446d : a50b                     lda ad1
+446f : 6d0519                   adc ada2        ;perform add
+4472 : 08                       php          
+4473 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+447a : 68                       pla             ;check flags
+447b : 2983                     and #$83        ;mask N-----ZC
+447d : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+4484 : 28                       plp
+4485 : 08                       php             ;save carry for next add
+4486 : a50b                     lda ad1
+4488 : ed0619                   sbc sba2        ;perform subtract
+448b : 08                       php          
+448c : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+4493 : 68                       pla             ;check flags
+4494 : 2983                     and #$83        ;mask N-----ZC
+4496 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+449d : 28                       plp
+                        ; decimal ADC / SBC #
+449e : 08                       php             ;save carry for subtract
+449f : a50c                     lda ad2
+44a1 : 8d0b19                   sta ex_adci+1   ;set ADC # operand
+44a4 : a50b                     lda ad1
+44a6 : 200a19                   jsr ex_adci     ;execute ADC # in RAM
+44a9 : 08                       php          
+44aa : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+44b1 : 68                       pla             ;check flags
+44b2 : 2983                     and #$83        ;mask N-----ZC
+44b4 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+44bb : 28                       plp
+44bc : 08                       php             ;save carry for next add
+44bd : a510                     lda sb2
+44bf : 8d0e19                   sta ex_sbci+1   ;set SBC # operand
+44c2 : a50b                     lda ad1
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   45
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+44c4 : 200d19                   jsr ex_sbci     ;execute SBC # in RAM
+44c7 : 08                       php          
+44c8 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+44cf : 68                       pla             ;check flags
+44d0 : 2983                     and #$83        ;mask N-----ZC
+44d2 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+44d9 : 28                       plp
+                        ; decimal ADC / SBC zp,x
+44da : 08                       php             ;save carry for subtract
+44db : a50b                     lda ad1
+44dd : 7500                     adc 0,x         ;perform add
+44df : 08                       php          
+44e0 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+44e7 : 68                       pla             ;check flags
+44e8 : 2983                     and #$83        ;mask N-----ZC
+44ea : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+44f1 : 28                       plp
+44f2 : 08                       php             ;save carry for next add
+44f3 : a50b                     lda ad1
+44f5 : f504                     sbc sb2-ad2,x   ;perform subtract
+44f7 : 08                       php          
+44f8 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+44ff : 68                       pla             ;check flags
+4500 : 2983                     and #$83        ;mask N-----ZC
+4502 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+4509 : 28                       plp
+                        ; decimal ADC / SBC abs,x
+450a : 08                       php             ;save carry for subtract
+450b : a50b                     lda ad1
+450d : 7df918                   adc ada2-ad2,x  ;perform add
+4510 : 08                       php          
+4511 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+4518 : 68                       pla             ;check flags
+4519 : 2983                     and #$83        ;mask N-----ZC
+451b : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+4522 : 28                       plp
+4523 : 08                       php             ;save carry for next add
+4524 : a50b                     lda ad1
+4526 : fdfa18                   sbc sba2-ad2,x  ;perform subtract
+4529 : 08                       php          
+452a : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+4531 : 68                       pla             ;check flags
+4532 : 2983                     and #$83        ;mask N-----ZC
+4534 : c50f                     cmp adrf
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   46
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                trap_ne         ;bad flags
+                        
+453b : 28                       plp
+                        ; decimal ADC / SBC abs,y
+453c : 08                       php             ;save carry for subtract
+453d : a50b                     lda ad1
+453f : 790618                   adc ada2-$ff,y  ;perform add
+4542 : 08                       php          
+4543 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+454a : 68                       pla             ;check flags
+454b : 2983                     and #$83        ;mask N-----ZC
+454d : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+4554 : 28                       plp
+4555 : 08                       php             ;save carry for next add
+4556 : a50b                     lda ad1
+4558 : f90718                   sbc sba2-$ff,y  ;perform subtract
+455b : 08                       php          
+455c : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+4563 : 68                       pla             ;check flags
+4564 : 2983                     and #$83        ;mask N-----ZC
+4566 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+456d : 28                       plp
+                        ; decimal ADC / SBC (zp,x)
+456e : 08                       php             ;save carry for subtract
+456f : a50b                     lda ad1
+4571 : 6144                     adc (lo adi2-ad2,x) ;perform add
+4573 : 08                       php          
+4574 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+457b : 68                       pla             ;check flags
+457c : 2983                     and #$83        ;mask N-----ZC
+457e : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+4585 : 28                       plp
+4586 : 08                       php             ;save carry for next add
+4587 : a50b                     lda ad1
+4589 : e146                     sbc (lo sbi2-ad2,x) ;perform subtract
+458b : 08                       php          
+458c : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+4593 : 68                       pla             ;check flags
+4594 : 2983                     and #$83        ;mask N-----ZC
+4596 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+459d : 28                       plp
+                        ; decimal ADC / SBC (abs),y
+459e : 08                       php             ;save carry for subtract
+459f : a50b                     lda ad1
+45a1 : 7154                     adc (adiy2),y   ;perform add
+45a3 : 08                       php          
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   47
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+45a4 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+45ab : 68                       pla             ;check flags
+45ac : 2983                     and #$83        ;mask N-----ZC
+45ae : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+45b5 : 28                       plp
+45b6 : 08                       php             ;save carry for next add
+45b7 : a50b                     lda ad1
+45b9 : f156                     sbc (sbiy2),y   ;perform subtract
+45bb : 08                       php          
+45bc : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+45c3 : 68                       pla             ;check flags
+45c4 : 2983                     and #$83        ;mask N-----ZC
+45c6 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+45cd : 28                       plp
+                        ; decimal ADC / SBC (zp)
+45ce : 08                       php             ;save carry for subtract
+45cf : a50b                     lda ad1
+45d1 : 7250                     adc (adi2)      ;perform add
+45d3 : 08                       php          
+45d4 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+45db : 68                       pla             ;check flags
+45dc : 2983                     and #$83        ;mask N-----ZC
+45de : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+45e5 : 28                       plp
+45e6 : 08                       php             ;save carry for next add
+45e7 : a50b                     lda ad1
+45e9 : f252                     sbc (sbi2)      ;perform subtract
+45eb : 08                       php          
+45ec : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+45f3 : 68                       pla             ;check flags
+45f4 : 2983                     and #$83        ;mask N-----ZC
+45f6 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+45fd : 28                       plp
+45fe : 60                       rts
+                        
+                        ; core subroutine of the full binary add/subtract test
+                        ; iterates through all combinations of operands and carry input
+                        ; uses increments/decrements to predict result & result flags
+45ff : a50f             chkadd  lda adrf        ;add V-flag if overflow
+4601 : 2983                     and #$83        ;keep N-----ZC / clear V
+4603 : 48                       pha
+4604 : a50b                     lda ad1         ;test sign unequal between operands
+4606 : 450c                     eor ad2
+4608 : 300a                     bmi ckad1       ;no overflow possible - operands have different sign
+460a : a50b                     lda ad1         ;test sign equal between operands and result
+460c : 450d                     eor adrl
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   48
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+460e : 1004                     bpl ckad1       ;no overflow occured - operand and result have same sign
+4610 : 68                       pla
+4611 : 0940                     ora #$40        ;set V
+4613 : 48                       pha
+4614 : 68               ckad1   pla
+4615 : 850f                     sta adrf        ;save expected flags
+                        ; binary ADC / SBC (zp)
+4617 : 08                       php             ;save carry for subtract
+4618 : a50b                     lda ad1
+461a : 7250                     adc (adi2)      ;perform add
+461c : 08                       php          
+461d : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+4624 : 68                       pla             ;check flags
+4625 : 29c3                     and #$c3        ;mask NV----ZC
+4627 : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+462e : 28                       plp
+462f : 08                       php             ;save carry for next add
+4630 : a50b                     lda ad1
+4632 : f252                     sbc (sbi2)      ;perform subtract
+4634 : 08                       php          
+4635 : c50d                     cmp adrl        ;check result
+                                trap_ne         ;bad result
+                        
+463c : 68                       pla             ;check flags
+463d : 29c3                     and #$c3        ;mask NV----ZC
+463f : c50f                     cmp adrf
+                                trap_ne         ;bad flags
+                        
+4646 : 28                       plp
+4647 : 60                       rts
+                                
+                        ; target for the jump indirect test
+4648 : 4e46             ji_adr  dw test_ji
+464a : 5837                     dw ji_ret
+                        
+464c : 88                       dey
+464d : 88                       dey
+464e :                  test_ji
+464e : 08                       php             ;either SP or Y count will fail, if we do not hit
+464f : 88                       dey
+4650 : 88                       dey
+4651 : 88                       dey
+4652 : 28                       plp
+                                trap_cs         ;flags loaded?
+                        
+                                trap_vs
+                        
+                                trap_mi
+                        
+                                trap_eq 
+                        
+4667 : c949                     cmp #'I'        ;registers loaded?
+                                trap_ne
+                        
+466e : e04e                     cpx #'N'
+                                trap_ne        
+                        
+4675 : c041                     cpy #('D'-3)
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   49
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                                trap_ne
+                        
+467c : 48                       pha             ;save a,x
+467d : 8a                       txa
+467e : 48                       pha
+467f : ba                       tsx
+4680 : e0fd                     cpx #$fd        ;check SP
+                                trap_ne
+                        
+4687 : 68                       pla             ;restore x
+4688 : aa                       tax
+                                set_stat $ff
+                        
+468d : 68                       pla             ;restore a
+468e : e8                       inx             ;return registers with modifications
+468f : 49aa                     eor #$aa        ;N=1, V=1, Z=0, C=1
+4691 : 6cff19                   jmp (ji_tab+2)
+4694 : ea                       nop
+4695 : ea                       nop
+                                trap            ;runover protection
+                        
+                        
+                        ; target for the jump indirect test
+4699 : f546             jxi_adr dw  trap_ind
+469b : f546                     dw  trap_ind
+469d : a746                     dw  test_jxi    ;+4
+469f : c237                     dw  jxi_ret     ;+6
+46a1 : f546                     dw  trap_ind
+46a3 : f546                     dw  trap_ind
+                        
+46a5 : 88                       dey
+46a6 : 88                       dey
+46a7 :                  test_jxi
+46a7 : 08                       php             ;either SP or Y count will fail, if we do not hit
+46a8 : 88                       dey
+46a9 : 88                       dey
+46aa : 88                       dey
+46ab : 28                       plp
+                                trap_cs         ;flags loaded?
+                        
+                                trap_vs
+                        
+                                trap_mi
+                        
+                                trap_eq 
+                        
+46c0 : c958                     cmp #'X'        ;registers loaded?
+                                trap_ne
+                        
+46c7 : e004                     cpx #4
+                                trap_ne        
+                        
+46ce : c046                     cpy #('I'-3)
+                                trap_ne
+                        
+46d5 : 48                       pha             ;save a,x
+46d6 : 8a                       txa
+46d7 : 48                       pha
+46d8 : ba                       tsx
+46d9 : e0fd                     cpx #$fd        ;check SP
+                                trap_ne
+                        
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   50
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+46e0 : 68                       pla             ;restore x
+46e1 : aa                       tax
+                                set_stat $ff
+                        
+46e6 : 68                       pla             ;restore a
+46e7 : e8                       inx             ;return registers with modifications
+46e8 : e8                       inx
+46e9 : 49aa                     eor #$aa        ;N=1, V=1, Z=0, C=1
+46eb : 7cf919                   jmp (jxi_tab,x)
+46ee : ea                       nop
+46ef : ea                       nop
+                                trap            ;runover protection
+                        
+                        
+                        ; JMP (abs,x) with bad x
+46f3 : ea                       nop
+46f4 : ea                       nop
+46f5 :                  trap_ind
+46f5 : ea                       nop
+46f6 : ea                       nop
+                                trap            ;near miss indexed indirect jump
+                        
+                        
+                        ;trap in case of unexpected IRQ, NMI, BRK, RESET
+46fa :                  nmi_trap
+                                trap            ;check stack for conditions at NMI
+                        
+46fd :                  res_trap
+                                trap            ;unexpected RESET
+                        
+4700 :                  irq_trap
+4700 : 08                       php             ;save decimal flag
+4701 : ba                       tsx             ;test break on stack
+4702 : bd0201                   lda $102,x
+4705 : 2910                     and #break
+                                trap_eq         ;check stack for conditions at IRQ
+                        
+                            if ROM_vectors = 1
+                                pla             ;test decimal mode cleared
+                                and #decmode
+                                trap_ne         ;decimal mode not cleared after BRK
+                                plp             ;pop saved flags
+                                pla             ;return address low
+                                cmp #lo(brk_ret)
+                                trap_ne         ;unexpected BRK
+                                pla             ;return address high
+                                cmp #hi(brk_ret)
+                                trap_ne         ;unexpected BRK
+                                jmp brk_ret
+                            else
+                                trap_ne         ;check stack for conditions at BRK
+                        
+                            endif
+                                
+                            if report = 1
+                                include "report.i65"
+                        ;**** report 6502 funtional test errors to standard I/O ****
+                        ;
+                        ;this include file is part of the 6502 functional tests
+                        ;it is used when you configure report = 1 in the tests
+                        ;
+                        ;to adopt the standard output vectors of your test environment
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   51
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        ;you must modify the rchar and rget subroutines in this include
+                        ;
+                        ;I/O hardware may have to be initialized in report_init
+                        
+                        ; For outputting text in MODE 7
+0070 =                  line_ptr = $70
+0072 =                  line_offset = $72
+                        
+                        ;print message macro - \1 = message location
+                        rprt    macro
+                                ldx #0
+                                lda \1
+                        loop\?
+                                jsr rchar
+                                inx
+                                lda \1,x
+                                bne loop\?
+                                endm
+                        
+                        ;initialize I/O as required (example: configure & enable ACIA)
+4711 :                  report_init
+                                ;nothing to initialize
+                                rprt rmsg_start
+                        
+471f : 60                       rts
+                                
+                        ;show stack (with saved registers), zeropage and absolute memory workspace
+                        ;after an error was trapped in the test program
+4720 :                  report_error
+                        ;save registers
+4720 : 08                       php
+4721 : 48                       pha
+4722 : 8a                       txa
+4723 : 48                       pha
+4724 : 98                       tya
+4725 : 48                       pha
+4726 : d8                       cld
+                        ;show stack with index to registers at error
+                                rprt rmsg_stack
+                        
+4735 : ba                       tsx
+4736 : e8                       inx
+4737 : a901                     lda #1      ;address high
+4739 : 20ea47                   jsr rhex
+473c : 8a                       txa         ;address low
+473d : 20ea47                   jsr rhex
+4740 : 20e647           rstack  jsr rspace
+4743 : bd0001                   lda $100,x  ;stack data
+4746 : 20ea47                   jsr rhex
+4749 : e8                       inx
+474a : d0f4                     bne rstack
+474c : 20dd47                   jsr rcrlf   ;new line
+                        ;show zero page workspace
+474f : a900                     lda #0
+4751 : 20ea47                   jsr rhex
+4754 : a90a                     lda #zpt
+4756 : aa                       tax
+4757 : 20ea47                   jsr rhex
+475a : 20e647           rzp     jsr rspace
+475d : b500                     lda 0,x
+475f : 20ea47                   jsr rhex
+4762 : e8                       inx
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   52
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+4763 : e011                     cpx #zp_bss
+4765 : d0f3                     bne rzp
+4767 : 20dd47                   jsr rcrlf
+                        ;show absolute workspace
+476a : a919                     lda #hi(data_segment)
+476c : 20ea47                   jsr rhex
+476f : a900                     lda #lo(data_segment)
+4771 : 20ea47                   jsr rhex
+4774 : a200                     ldx #0
+4776 : 20e647           rabs    jsr rspace
+4779 : bd0019                   lda data_segment,x
+477c : 20ea47                   jsr rhex
+477f : e8                       inx
+4780 : e00a                     cpx #(data_bss-data_segment)
+4782 : d0f2                     bne rabs
+                        ;ask to continue
+                                rprt rmsg_cont
+                        
+4792 : 20d047           rerr1   jsr rget
+4795 : c943                     cmp #'C'
+4797 : d0f9                     bne rerr1        
+                        ;restore registers
+4799 : 68                       pla
+479a : a8                       tay
+479b : 68                       pla
+479c : aa                       tax
+479d : 68                       pla 
+479e : 28                       plp
+479f : 60                       rts   
+                        
+                        ;show test has ended, ask to repeat
+47a0 :                  report_success
+                            if rep_int = 1
+                                rprt rmsg_priority
+                                lda data_segment    ;show interrupt sequence
+                                jsr rhex
+                                jsr rspace
+                                lda data_segment+1
+                                jsr rhex
+                                jsr rspace
+                                lda data_segment+2
+                                jsr rhex
+                            endif
+                                rprt rmsg_success
+                        
+47ae : a900                     lda #0
+47b0 : 8570                     sta $70
+47b2 :                  kbd_loop
+47b2 : a670                     ldx $70
+47b4 : bc5948                   ldy rmsg_kbd,x
+47b7 : d00c                     bne kbd_input
+47b9 : a915                     lda #21
+47bb : 20eeff                   jsr $ffee ; disable VDU
+47be : a26d                     ldx #lo(rmsg_basic)
+47c0 : a048                     ldy #hi(rmsg_basic)
+47c2 : 4cf7ff                   jmp $fff7
+47c5 :                  kbd_input
+47c5 : a98a                     lda #138
+47c7 : a200                     ldx #0
+47c9 : 20f4ff                   jsr $fff4
+47cc : e670                     inc $70
+47ce : d0e2                     bne kbd_loop
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   53
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        ;rsuc1   jsr rget
+                        ;        cmp #'R'
+                        ;        bne rsuc1
+                        ;        rts
+                        
+                        ;input subroutine
+                        ;get a character from standard input 
+                        ;adjust according to the needs in your test environment
+47d0 :                  rget                ;get character in A
+47d0 : 4cd047                   jmp rget ; no keyboard input so hang
+                        ;rget1
+                        ;        lda $bff1   ;wait RDRF
+                        ;        and #8
+                        ;        beq rget1
+                        ;not a real ACIA - so RDRF is not checked
+47d3 : adf0bf                   lda $bff0   ;read acia rx reg
+                        ;the load can be replaced by a call to a kernal routine
+                        ;        jsr $ffcf   ;example: CHRIN for a C64
+47d6 : c961                     cmp #'a'    ;lower case
+47d8 : 9002                     bcc rget1
+47da : 295f                     and #$5f    ;convert to upper case
+47dc : 60               rget1   rts
+                        
+                        ;output subroutines
+47dd : a90a             rcrlf   lda #10
+47df : 20fe47                   jsr rchar
+47e2 : a90d                     lda #13
+47e4 : d018                     bne rchar
+                        
+47e6 : a920             rspace  lda #' '
+47e8 : d014                     bne rchar
+                                
+47ea : 48               rhex    pha         ;report hex byte in A
+47eb : 4a                       lsr a       ;high nibble first
+47ec : 4a                       lsr a
+47ed : 4a                       lsr a
+47ee : 4a                       lsr a
+47ef : 20f547                   jsr rnib
+47f2 : 68                       pla         ;now low nibble
+47f3 : 290f                     and #$f
+                        
+47f5 : 18               rnib    clc         ;report nibble in A
+47f6 : 6930                     adc #'0'    ;make printable 0-9
+47f8 : c93a                     cmp #'9'+1
+47fa : 9002                     bcc rchar
+47fc : 6906                     adc #6      ;make printable A-F
+                        
+                        ;send a character to standard output 
+                        ;adjust according to the needs in your test environment
+                        ;register X needs to be preserved!
+47fe :                  rchar               ;report character in A
+47fe : 4ceeff                   jmp $ffee
+                        
+4801 :                  rmsg_start
+4801 : 0a0d5374617274..         db  10,13,"Started testing",10,13,0
+4815 :                  rmsg_stack
+4815 : 0a0d7265677320..         db  10,13,"regs Y  X  A  PS PCLPCH",10,13,0
+4831 :                  rmsg_cont
+4831 : 0a0d5465737420..         db  10,13,"Test failed",10,13,0
+4841 :                  rmsg_success
+4841 : 0a0d416c6c2074..         db  10,13,"All tests completed",10,13,0
+4859 :                  rmsg_kbd
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   54
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+4859 : 41253d310d4348..         db  "A%=1",13,"CHAIN",34,"$.MENU",34,13,0
+486d :                  rmsg_basic
+486d : 42415349430d             db  "BASIC",13
+                        
+                            if rep_int = 1
+                        rmsg_priority
+                                db  10,13,"interrupt sequence (NMI IRQ BRK) ",0
+                            endif
+                           
+                            endif
+                                    
+                        ;copy of data to initialize BSS segment
+                            if load_data_direct != 1
+                        zp_init
+                        zp1_    db  $c3,$82,$41,0   ;test patterns for LDx BIT ROL ROR ASL LSR
+                        zp7f_   db  $7f             ;test pattern for compare  
+                        ;logical zeropage operands
+                        zpOR_   db  0,$1f,$71,$80   ;test pattern for OR
+                        zpAN_   db  $0f,$ff,$7f,$80 ;test pattern for AND
+                        zpEO_   db  $ff,$0f,$8f,$8f ;test pattern for EOR
+                        ;indirect addressing pointers
+                        ind1_   dw  abs1            ;indirect pointer to pattern in absolute memory
+                                dw  abs1+1
+                                dw  abs1+2
+                                dw  abs1+3
+                                dw  abs7f
+                        inw1_   dw  abs1-$f8        ;indirect pointer for wrap-test pattern
+                        indt_   dw  abst            ;indirect pointer to store area in absolute memory
+                                dw  abst+1
+                                dw  abst+2
+                                dw  abst+3
+                        inwt_   dw  abst-$f8        ;indirect pointer for wrap-test store
+                        indAN_  dw  absAN           ;indirect pointer to AND pattern in absolute memory
+                                dw  absAN+1
+                                dw  absAN+2
+                                dw  absAN+3
+                        indEO_  dw  absEO           ;indirect pointer to EOR pattern in absolute memory
+                                dw  absEO+1
+                                dw  absEO+2
+                                dw  absEO+3
+                        indOR_  dw  absOR           ;indirect pointer to OR pattern in absolute memory
+                                dw  absOR+1
+                                dw  absOR+2
+                                dw  absOR+3
+                        ;add/subtract indirect pointers
+                        adi2_   dw  ada2            ;indirect pointer to operand 2 in absolute memory
+                        sbi2_   dw  sba2            ;indirect pointer to complemented operand 2 (SBC)
+                        adiy2_  dw  ada2-$ff        ;with offset for indirect indexed
+                        sbiy2_  dw  sba2-$ff
+                        zp_end
+                            if (zp_end - zp_init) != (zp_bss_end - zp_bss)   
+                                ;force assembler error if size is different   
+                                ERROR ERROR ERROR   ;mismatch between bss and zeropage data
+                            endif 
+                        data_init
+                        ex_adc_ adc #0              ;execute immediate opcodes
+                                rts
+                        ex_sbc_ sbc #0              ;execute immediate opcodes
+                                rts
+                        abs1_   db  $c3,$82,$41,0   ;test patterns for LDx BIT ROL ROR ASL LSR
+                        abs7f_  db  $7f             ;test pattern for compare
+                        ;loads
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   55
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+                        fLDx_   db  fn,fn,0,fz      ;expected flags for load
+                        ;shifts
+                        rASL_                       ;expected result ASL & ROL -carry  
+                        rROL_   db  $86,$04,$82,0   ; "
+                        rROLc_  db  $87,$05,$83,1   ;expected result ROL +carry
+                        rLSR_                       ;expected result LSR & ROR -carry
+                        rROR_   db  $61,$41,$20,0   ; "
+                        rRORc_  db  $e1,$c1,$a0,$80 ;expected result ROR +carry
+                        fASL_                       ;expected flags for shifts
+                        fROL_   db  fnc,fc,fn,fz    ;no carry in
+                        fROLc_  db  fnc,fc,fn,0     ;carry in
+                        fLSR_
+                        fROR_   db  fc,0,fc,fz      ;no carry in
+                        fRORc_  db  fnc,fn,fnc,fn   ;carry in
+                        ;increments (decrements)
+                        rINC_   db  $7f,$80,$ff,0,1 ;expected result for INC/DEC
+                        fINC_   db  0,fn,fn,fz,0    ;expected flags for INC/DEC
+                        ;logical memory operand
+                        absOR_  db  0,$1f,$71,$80   ;test pattern for OR
+                        absAN_  db  $0f,$ff,$7f,$80 ;test pattern for AND
+                        absEO_  db  $ff,$0f,$8f,$8f ;test pattern for EOR
+                        ;logical accu operand
+                        absORa_ db  0,$f1,$1f,0     ;test pattern for OR
+                        absANa_ db  $f0,$ff,$ff,$ff ;test pattern for AND
+                        absEOa_ db  $ff,$f0,$f0,$0f ;test pattern for EOR
+                        ;logical results
+                        absrlo_ db  0,$ff,$7f,$80
+                        absflo_ db  fz,fn,0,fn
+                        data_end
+                            if (data_end - data_init) != (data_bss_end - data_bss)
+                                ;force assembler error if size is different   
+                                ERROR ERROR ERROR   ;mismatch between bss and data
+                            endif 
+                        
+                        vec_init
+                                dw  nmi_trap
+                                dw  res_trap
+                                dw  irq_trap
+                        vec_bss equ $fffa
+                            endif                   ;end of RAM init data
+                            
+                        ; code at end of image due to the need to add blank space as required
+                            if ($ff & (ji_ret - * - 2)) < ($ff & (jxi_ret - * - 2))
+                        ; JMP (abs) when $xxff and $xx00 are from same page
+                                ds  lo(ji_ret - * - 2)
+                                nop
+                                nop
+                        ji_px   nop             ;low address byte matched with ji_ret 
+                                nop
+                                trap            ;jmp indirect page cross bug
+                        
+                        ; JMP (abs,x) when $xxff and $xx00 are from same page
+                                ds  lo(jxi_ret - * - 2)
+                                nop
+                                nop
+                        jxi_px  nop             ;low address byte matched with jxi_ret 
+                                nop
+                                trap            ;jmp indexed indirect page cross bug
+                            else
+                        ; JMP (abs,x) when $xxff and $xx00 are from same page
+4873 : 00000000000000..         ds  lo(jxi_ret - * - 2)
+48c0 : ea                       nop
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   56
+------------------------------------------------ 65C02_extended_opcodes_test.a65c ------------------------------------------------
+
+48c1 : ea                       nop
+48c2 : ea               jxi_px  nop             ;low address byte matched with jxi_ret 
+48c3 : ea                       nop
+                                trap            ;jmp indexed indirect page cross bug
+                        
+                        
+                        ; JMP (abs) when $xxff and $xx00 are from same page
+48c7 : 00000000000000..         ds  lo(ji_ret - * - 2)
+4956 : ea                       nop
+4957 : ea                       nop
+4958 : ea               ji_px   nop             ;low address byte matched with ji_ret 
+4959 : ea                       nop
+                                trap            ;jmp indirect page cross bug
+                        
+                            endif
+                            
+                            if (load_data_direct = 1) & (ROM_vectors = 1)  
+                                org $fffa       ;vectors
+                                dw  nmi_trap
+                                dw  res_trap
+                                dw  irq_trap
+                            endif
+                        
+4958 =                          end start
+                        
+No errors in pass 2.
+Wrote binary from address $0000 through $495c.
+Total size 18781 bytes.
+Program start address is at $1b00 (6912).
+
