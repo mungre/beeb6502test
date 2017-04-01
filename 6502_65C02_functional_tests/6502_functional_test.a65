@@ -121,6 +121,8 @@ report = 0
 ;leave disabled if a monitor, OS or background interrupt is allowed to alter RAM
 ram_top = -1
 
+        include "config.i65"
+
 ;disable test decimal mode ADC & SBC, 0=enable, 1=disable,
 ;2=disable including decimal flag in processor status
 disable_decimal = 0

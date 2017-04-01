@@ -39,6 +39,9 @@ end_of_test macro
 
         bss
         org 0
+
+        include "configbcd.i65"
+
 ; operands - register Y = carry in
 N1      ds  1
 N2      ds  1
@@ -65,7 +68,7 @@ N2L     ds  1
 N2H     ds  2
 
         code
-        org $200
+        org $6800
 TEST    ldy #1    ; initialize Y (used to loop through carry flag values)
         sty ERROR ; store 1 in ERROR until the test passes
         lda #0    ; initialize N1 and N2

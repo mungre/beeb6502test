@@ -117,6 +117,8 @@ ram_top = -1
 
         noopt       ;do not take shortcuts
         
+        include "config.i65"
+
 ;macros for error & success traps to allow user modification
 ;example:
 ;trap    macro

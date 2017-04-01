@@ -1,0 +1,31 @@
+; C O N F I G U R A T I O N
+
+;This overrides the default configuration options
+
+;ROM_vectors writable (0=no, 1=yes)
+;if ROM vectors can not be used interrupts will not be trapped
+;as a consequence BRK can not be tested but will be emulated to test RTI
+ROM_vectors = 0
+
+;code_segment memory start address, 13kB of consecutive space required
+;                                   add 2.5 kB if I_flag = 2
+code_segment = $1B00
+
+;data_segment memory start address, $6A (106) consecutive Bytes required
+data_segment = code_segment - $200
+    if (data_segment & $ff) != 0
+        ERROR ERROR ERROR low byte of data_segment MUST be $00 !!
+    endif
+
+;report errors through I/O channel (0=use standard self trap loops, 1=include
+;report.i65 as I/O channel, add 3.5 kB)
+report = 1
+
+;RAM integrity test option. Checks for undesired RAM writes.
+;set lowest non RAM or RAM mirror address page (-1=disable, 0=64k, $40=16k)
+;leave disabled if a monitor, OS or background interrupt is allowed to alter RAM
+ram_top = -1
+
+; Reserve a byte at $0 to include it in the binary
+        org $0
+        ds 1
