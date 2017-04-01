@@ -1,0 +1,39 @@
+; Additional tests for beebem
+; These are in a separate file to keep updates simple
+
+; test wraparound at end of memory for lda (),y
+
+        lda #lo(-5)
+        sta adrl
+        lda #hi(-5)
+        sta adrh
+        ldy #6
+        lda (adrl),y
+        cmp $01
+        trap_ne
+        inc $01
+        lda (adrl),y
+        cmp $01
+        trap_ne
+
+; test wraparound at end of zp for lda ($ff),y
+        sei
+        lda $ff
+        sta adrf ; save $ff
+        lda #adrl
+        sta $ff
+        lda #0
+        sta $00
+        lda #1
+        sta $100
+        ldy #0
+        lda ($ff),y
+        cmp adrl
+        trap_ne
+        inc adrl
+        lda ($ff),y
+        cmp adrl
+        trap_ne
+        lda adrf ; restore $ff
+        sta $ff
+        cli

@@ -27,8 +27,11 @@ as65 -l -w -x 65C02_extended_opcodes_test.a65c
 if errorlevel 1 goto pop_fail
 popd
 
-beebasm -do 6502test.ssd -opt 3 -i menu\6502test.asm && ^
-start /separate \Progs\beebem-windows\Src\Release\beebem 6502test.ssd
+beebasm -do 6502test.ssd -opt 3 -i menu\6502test.asm
+if errorlevel 1 goto :eof
+
+rem start /separate \Progs\beebem-windows\Src\Release\beebem 6502test.ssd
+
 goto :eof
 
 :pop_fail
