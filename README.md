@@ -8,10 +8,14 @@ The basic BCD test uses valid BCD numbers and ignores the N, V and Z flags.  The
 
 build.bat creates the SSD file.
 
-You need Frank Kingswood's 6502 assembler to build the tests
+You need Frank Kingswood's 6502 assembler to build the tests  
 http://www.kingswood-consulting.co.uk/assemblers/index.html
 
-and Rich Talbot-Watkins's 6502 assembler to build the test harness and the SSD.
+and Rich Talbot-Watkins's 6502 assembler to build the test harness and the SSD.  
 http://www.retrosoftware.co.uk/wiki/index.php?title=BeebAsm
+
+This skips the IRQ-handling test because that requires write access to the IRQ vector at &fffe.  This could be arranged in the emulator, but a problem in this area would already be obvious.  The memory integrity test is also skipped because the OS remains enabled during testing.  Again, an existing problem here would already be obvious.
+
+The Rockwell and WDC bit manipulation instructions are not tested because the Master's 65SC02 does not have them.
 
 Licensed under the GNU General Public License version 3
