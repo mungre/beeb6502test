@@ -23,7 +23,15 @@ popd
 pushd 6502_65C02_functional_tests
 as65 -l -w 6502_functional_test.a65
 if errorlevel 1 goto pop_fail
-as65 -l -w -x 65C02_extended_opcodes_test.a65c
+popd
+
+pushd 6502_65C02_functional_tests\65SC02
+as65 -l -w -x -o..\65SC02.bin -l..\65SC02.lst ..\65C02_extended_opcodes_test.a65c
+if errorlevel 1 goto pop_fail
+popd
+
+pushd 6502_65C02_functional_tests\65C02
+as65 -l -w -x -o..\65C02.bin -l..\65C02.lst ..\65C02_extended_opcodes_test.a65c
 if errorlevel 1 goto pop_fail
 popd
 

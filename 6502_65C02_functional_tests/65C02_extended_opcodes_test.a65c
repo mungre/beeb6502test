@@ -117,7 +117,7 @@ ram_top = -1
 
         noopt       ;do not take shortcuts
         
-        include "config.i65"
+        include "configex.i65"
 
 ;macros for error & success traps to allow user modification
 ;example:
@@ -2617,7 +2617,7 @@ irq_trap
     endif
         
     if report = 1
-        include "report.i65"
+        include "..\report.i65"
     endif
             
 ;copy of data to initialize BSS segment

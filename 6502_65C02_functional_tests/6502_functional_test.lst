@@ -1,7 +1,7 @@
 AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    1
 ---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
 
-6283 lines read, no errors in pass 1.
+6284 lines read, no errors in pass 1.
                         ;
                         ; 6 5 0 2   F U N C T I O N A L   T E S T
                         ;
@@ -151,10 +151,6 @@ ffff =                  ram_top = -1
                                 ERROR ERROR ERROR low byte of data_segment MUST be $00 !!
                             endif
                         
-                        ;added Rockwell & WDC opcodes BBR, BBS, RMB & SMB
-                        ;(0=test as NOPs, 1=full test, >1=no test)
-0000 =                  rkwl_wdc_op = 0
-                        
                         ;report errors through I/O channel (0=use standard self trap loops, 1=include
                         ;report.i65 as I/O channel, add 3.5 kB)
 0001 =                  report = 1
@@ -193,13 +189,13 @@ ffff =                  ram_top = -1
                         trap    macro
                                 jmp *           ;failed anyway
                                 endm
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    4
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         trap_eq macro
                                 beq *           ;failed equal (zero)
                                 endm
                         trap_ne macro
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    4
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 bne *           ;failed not equal (non zero)
                                 endm
                         trap_cs macro
@@ -258,13 +254,13 @@ ffff =                  ram_top = -1
                         trap_pl macro
                                 bmi skip\?
                                 trap            ;failed plus (bit 7 clear)
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    5
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         skip\?
                                 endm
                         trap_vs macro
                                 bvc skip\?
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    5
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 trap            ;failed overflow set
                         skip\?
                                 endm
@@ -323,13 +319,13 @@ ffff =                  ram_top = -1
                         eor_flag    macro
                                     eor #(\1&m8i|fao)   ;mask I, invert expected flags + always on bits
                                     endm
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    6
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 endif
                                 if I_flag = 1
                         load_flag   macro
                                     lda #\1|intdis      ;force disable interrupts
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    6
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                     endm
                         cmp_flag    macro
                                     cmp #(\1|fai)&m8    ;I_flag is always disabled + always on bits
@@ -388,13 +384,13 @@ ffff =                  ram_top = -1
                                     endm
                         eor_flag    macro
                                     ora #decmode        ;ignore decimal mode bit
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    7
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                     eor #(\1|faid)      ;invert expected flags + always on bits + I
                                     endm
                                 endif
                                 if I_flag = 2
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    7
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         load_flag   macro
                                     lda #\1
                                     ora flag_I_on       ;restore I-flag
@@ -453,13 +449,13 @@ ffff =                  ram_top = -1
                                     ldy #\1     ;precharge index y
                                     plp
                                     endm
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    8
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
                         set_ax      macro       ;precharging indexed accu & immediate status
                                     load_flag \2
                                     pha         ;use stack to load status
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    8
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                     lda \1,x    ;precharge accu
                                     plp
                                     endm
@@ -518,13 +514,13 @@ ffff =                  ram_top = -1
                                     cmp #\1     ;test result
                                     trap_ne
                                     pla         ;load status
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    9
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                     pha
                                     cmp_flag \2
                                     trap_ne
                                     plp         ;restore status
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page    9
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                     endm
                         
                         tst_x       macro       ;testing result in x index & flags
@@ -583,13 +579,13 @@ ffff =                  ram_top = -1
                         tst_zx      macro       ;testing result in zp,x & flags
                                     php         ;save flags
                                     lda zpt,x
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   10
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                     cmp \1,x    ;test result
                                     trap_ne
                                     pla         ;load status
                                     eor_flag \3
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   10
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                     cmp \2,x    ;test flags
                                     trap_ne
                                     endm
@@ -648,13 +644,13 @@ ffff =                  ram_top = -1
                                     bne ccs5\?
                                     inx             ;advance RAM high address
                                     stx zpt+1
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   11
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                     cpx #ram_top
                                     bne ccs5\?
                                     sta zpt+2       ;checksum low is
                                     cmp ram_chksm   ;checksum low expected
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   11
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                     trap_ne         ;checksum mismatch
                                     lda zpt+3       ;checksum high is
                                     cmp ram_chksm+1 ;checksum high expected
@@ -713,13 +709,13 @@ ffff =                  ram_top = -1
 002a : 1a19                     dw  abs1+3
 002c : 1b19                     dw  abs7f
 002e : 1f18             inw1    dw  abs1-$f8        ;indirect pointer for wrap-test pattern
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   12
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 0030 : 0319             indt    dw  abst            ;indirect pointer to store area in absolute memory
 0032 : 0419                     dw  abst+1
 0034 : 0519                     dw  abst+2
 0036 : 0619                     dw  abst+3
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   12
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 0038 : 0b18             inwt    dw  abst-$f8        ;indirect pointer for wrap-test store
 003a : 4e19             indAN   dw  absAN           ;indirect pointer to AND pattern in absolute memory
 003c : 4f19                     dw  absAN+1
@@ -778,13 +774,13 @@ ffff =                  ram_top = -1
 1928 :                  rLSR                        ;expected result LSR & ROR -carry
 1928 : 61412000         rROR    db  $61,$41,$20,0   ; "
 192c : e1c1a080         rRORc   db  $e1,$c1,$a0,$80 ;expected result ROR +carry
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   13
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 1930 :                  fASL                        ;expected flags for shifts
 1930 : 81018002         fROL    db  fnc,fc,fn,fz    ;no carry in
 1934 : 81018000         fROLc   db  fnc,fc,fn,0     ;carry in
 1938 :                  fLSR
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   13
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1938 : 01000102         fROR    db  fc,0,fc,fz      ;no carry in
 193c : 81808180         fRORc   db  fnc,fn,fnc,fn   ;carry in
                         ;increments (decrements)
@@ -843,13 +839,13 @@ ffff =                  ram_top = -1
 1b20 : 88                       dey
 1b21 : 88                       dey
 1b22 : f017                     beq psb_fwok
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   14
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap        ;forward offset
                         
                         
 1b27 : ca                       dex         ;backward landing zone
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   14
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1b28 : ca                       dex
 1b29 : ca                       dex
 1b2a : ca                       dex
@@ -908,13 +904,13 @@ ffff =                  ram_top = -1
                               if disable_selfmod = 0
                                 sta range_adr   ;reset self modifying code
                               endif
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   15
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 clc
                                 ldx #zp_bss-zero_page ;zeropage - write test area
                         gcs3    adc zero_page,x
                                 bcc gcs2
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   15
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 inc ram_chksm+1 ;carry to high byte
                                 clc
                         gcs2    inx
@@ -973,13 +969,13 @@ ffff =                  ram_top = -1
 1b6e : ca                       dex
 1b6f : ca                       dex
 1b70 : ca                       dex
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   16
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 1b71 : ca                       dex
 1b72 : ca                       dex
 1b73 : ca                       dex
 1b74 : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   16
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1b75 : ca                       dex             ;-120
 1b76 : ca                       dex
 1b77 : ca                       dex
@@ -1038,13 +1034,13 @@ ffff =                  ram_top = -1
 1bac : ca                       dex
 1bad : ca                       dex
 1bae : ca                       dex
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   17
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 1baf : ca                       dex
 1bb0 : ca                       dex
 1bb1 : ca                       dex             ;-60
 1bb2 : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   17
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1bb3 : ca                       dex
 1bb4 : ca                       dex
 1bb5 : ca                       dex
@@ -1103,13 +1099,13 @@ ffff =                  ram_top = -1
 1bea : ca                       dex             ;-3
 1beb :                  range_op                ;test target with zero flag=0, z=1 if previous dex
 1bec =                  range_adr   = *+1       ;modifiable relative address
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   18
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 1beb : f03e                     beq *+64        ;+64 if called without modification
 1bed : ca                       dex             ;+0
 1bee : ca                       dex
 1bef : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   18
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1bf0 : ca                       dex
 1bf1 : ca                       dex
 1bf2 : ca                       dex
@@ -1168,13 +1164,13 @@ ffff =                  ram_top = -1
 1c27 : ca                       dex
 1c28 : ca                       dex
 1c29 : ca                       dex             ;+60
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   19
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 1c2a : ca                       dex
 1c2b : ca                       dex
 1c2c : ca                       dex
 1c2d : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   19
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1c2e : ca                       dex
 1c2f : ca                       dex
 1c30 : ca                       dex
@@ -1233,13 +1229,13 @@ ffff =                  ram_top = -1
 1c65 : ca                       dex             ;+120
 1c66 : ca                       dex
 1c67 : ca                       dex
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   20
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 1c68 : ca                       dex
 1c69 : ca                       dex
 1c6a : ca                       dex
 1c6b : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   20
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1c6c : ea                       nop             ;offset landing zone - forward branch too far
 1c6d : ea                       nop
 1c6e : ea                       nop
@@ -1298,13 +1294,13 @@ ffff =                  ram_top = -1
                         
 1cd3 : e001                     cpx #1
                                 trap_eq 
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   21
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
                                 trap_cs
                         
                                 trap_pl
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   21
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 1ce4 : a8                       tay 
 1ce5 : c000                     cpy #0          ;test compare y immediate
@@ -1363,13 +1359,13 @@ ffff =                  ram_top = -1
 1d63 : 101a                     bpl nbr1        ;branches should not be taken
 1d65 : 501b                     bvc nbr2
 1d67 : 901c                     bcc nbr3
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   22
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 1d69 : d01d                     bne nbr4
 1d6b : 3003                     bmi br1         ;branches should be taken
                                 trap 
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   22
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1d70 : 7003             br1     bvs br2
                                 trap 
                         
@@ -1428,13 +1424,13 @@ ffff =                  ram_top = -1
                         
 1dc7 :                  nbr12
                                 trap            ;previous bvs taken 
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   23
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 1dca :                  nbr13
                                 trap            ;previous bcs taken 
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   23
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1dcd :                  nbr14
                                 trap            ;previous beq taken 
                         
@@ -1493,13 +1489,13 @@ ffff =                  ram_top = -1
                         
 1e19 :                  brcs8
                                 set_stat minus
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   24
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 1e1d : f002                     beq brmi1
 1e1f : d003                     bne brmi2
 1e21 :                  brmi1
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   24
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 trap            ;branch zero/non zero
                         
 1e24 : b002             brmi2   bcs brmi3
@@ -1558,13 +1554,13 @@ ffff =                  ram_top = -1
 1e6f :                  brzc5
                                 trap            ;branch minus/plus
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   25
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 1e72 : 5002             brzc6   bvc brzc7
 1e74 : 7003                     bvs brzc8
 1e76 :                  brzc7
                                 trap            ;branch overflow/no overflow
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   25
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 1e79 :                  brzc8
                                 set_stat $ff-carry
@@ -1623,13 +1619,13 @@ ffff =                  ram_top = -1
 1ec4 : 9002             brvc2   bcc brvc3
 1ec6 : b003                     bcs brvc4
 1ec8 :                  brvc3
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   26
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap            ;branch carry/no carry
                         
 1ecb : 1002             brvc4   bpl brvc5
 1ecd : 3003                     bmi brvc6
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   26
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1ecf :                  brvc5
                                 trap            ;branch minus/plus
                         
@@ -1688,13 +1684,13 @@ ffff =                  ram_top = -1
                                 set_a $fe,$ff
                         
 1fba : 68                       pla
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   27
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 tst_a 1,$ff-zero-minus
                         
                                 set_a 0,0
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   27
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 1fd3 : 68                       pla
                                 tst_a $ff,minus
                         
@@ -1753,13 +1749,13 @@ ffff =                  ram_top = -1
 20ad : ea                       nop
                                 tst_a $e7,$ff
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   28
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 20c0 : e0db                     cpx #$db
                                 trap_ne
                         
 20c7 : c0bd                     cpy #$bd
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   28
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 trap_ne
                         
                                 next_test
@@ -1818,13 +1814,13 @@ ffff =                  ram_top = -1
                                 trap_vc
                         
 2142 : c946                     cmp #'F'        ;passed registers OK?
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   29
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne
                         
 2149 : e041                     cpx #'A'
                                 trap_ne
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   29
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 2150 : c052                     cpy #'R'
                                 trap_ne
@@ -1883,13 +1879,13 @@ ffff =                  ram_top = -1
 21ca : 20485a                   jsr test_jsr
 21cc =                  jsr_ret = *-1           ;last address of jsr = return address
 21cd : 08                       php             ;either SP or Y count will fail, if we do not hit
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   30
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 21ce : 88                       dey
 21cf : 88                       dey
 21d0 : 88                       dey
 21d1 : 28                       plp
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   30
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 trap_eq         ;returned flags OK?
                         
                                 trap_pl
@@ -1948,13 +1944,13 @@ ffff =                  ram_top = -1
                                 trap_ne
                         
 223b : c045                     cpy #('K'-6)
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   31
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne
                         
 2242 : 68                       pla             ;returned flags OK (unchanged)?
                                 cmp_flag 0
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   31
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
                                 trap_ne
                         
@@ -2013,13 +2009,13 @@ ffff =                  ram_top = -1
                                 tst_stat decmode
                         
 2304 : d8                       cld
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   32
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 tst_stat 0  
                         
                                 set_stat overfl
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   32
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 tst_stat overfl
                         
 231f : b8                       clv
@@ -2078,13 +2074,13 @@ ffff =                  ram_top = -1
 242f : c8                       iny             ;01
                                 tst_y 1,$ff-minus-zero
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   33
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2442 : 88                       dey             ;00
                                 tst_y 0,$ff-minus
                         
 2455 : 88                       dey             ;ff
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   33
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 tst_y $ff,$ff-zero
                         
 2468 : 88                       dey             ;fe
@@ -2143,13 +2139,13 @@ ffff =                  ram_top = -1
                         
                                                 
 2554 : a0ff                     ldy #$ff
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   34
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_stat $ff
                         
 255a : 98                       tya
                                 tst_a $ff,$ff-zero
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   34
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 256d : 08                       php
 256e : c8                       iny             ;00
@@ -2208,13 +2204,13 @@ ffff =                  ram_top = -1
                         
 2626 : 48                       pha
 2627 : a900                     lda #0
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   35
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2629 : 8a                       txa
 262a : 28                       plp
 262b : a8                       tay
                                 tst_y 1,0
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   35
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 263e : 08                       php
 263f : ca                       dex             ;00
@@ -2273,13 +2269,13 @@ ffff =                  ram_top = -1
                         
 26e5 : 08                       php
 26e6 : 88                       dey             ;ff
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   36
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 26e7 : 98                       tya
 26e8 : 28                       plp
 26e9 : aa                       tax
                                 tst_x $ff,minus
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   36
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
                                 next_test
                         
@@ -2338,13 +2334,13 @@ ffff =                  ram_top = -1
                         
 2763 : 9a                       txs
 2764 : 08                       php
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   37
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2765 : adff01                   lda $1ff
                                 cmp_flag 0
                         
                                 
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   37
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 276a : a201                     ldx #1
 276c : 9a                       txs             ;sp=01
                                 set_stat $ff
@@ -2403,13 +2399,13 @@ ffff =                  ram_top = -1
 27d0 : ba                       tsx             ;clears N, sets Z
 27d1 : 08                       php             ;sp=ff
 27d2 : e000                     cpx #0
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   38
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne
                         
 27d9 : ad0001                   lda $100
                                 cmp_flag zero
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   38
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
                                 trap_ne
                         
@@ -2468,13 +2464,13 @@ ffff =                  ram_top = -1
 2843 : 08                       php         ;flags after load/store sequence
 2844 : 49c3                     eor #$c3
 2846 : d91719                   cmp abs1,y  ;test result
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   39
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne
                         
 284e : 68                       pla         ;load status
                                 eor_flag lo~fnz ;mask bits not altered
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   39
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 2851 : d91c19                   cmp fLDx,y  ;test flags
                                 trap_ne
@@ -2533,13 +2529,13 @@ ffff =                  ram_top = -1
 28ae : 10d8                     bpl tldx3
                                 
 28b0 : a003                     ldy #3      ;testing store result
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   40
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 28b2 : a200                     ldx #0
 28b4 : b90c00           tstx    lda zpt,y
 28b7 : 49c3                     eor #$c3
 28b9 : d91300                   cmp zp1,y
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   40
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 trap_ne     ;store to zp data
                         
 28c1 : 960c                     stx zpt,y   ;clear                
@@ -2598,13 +2594,13 @@ ffff =                  ram_top = -1
 293b : 49c3                     eor #$c3
 293d : 28                       plp
 293e : 9d0319                   sta abst,x
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   41
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2941 : 08                       php         ;flags after load/store sequence
 2942 : 49c3                     eor #$c3
 2944 : dd1719                   cmp abs1,x  ;test result
                                 trap_ne
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   41
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 294c : 68                       pla         ;load status
                                 eor_flag 0
@@ -2663,13 +2659,13 @@ ffff =                  ram_top = -1
                         
 29a9 : ca                       dex
 29aa : 10d9                     bpl tldy2                  
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   42
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 29ac : a203                     ldx #3
 29ae :                  tldy3
                                 set_stat $ff
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   42
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 29b2 : bc1719                   ldy abs1,x
 29b5 : 08                       php         ;test stores do not alter flags
@@ -2728,13 +2724,13 @@ ffff =                  ram_top = -1
 2a20 : b0f6                     bcs tldy5                  
 2a22 : a203                     ldx #3      ;testing wraparound result
 2a24 : a000                     ldy #0
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   43
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2a26 : b50c             tsty1   lda zpt,x
 2a28 : d513                     cmp zp1,x
                                 trap_ne     ;store to zp,x data
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   43
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2a2f : 940c                     sty zpt,x   ;clear                
 2a31 : bd0319                   lda abst,x
 2a34 : dd1719                   cmp abs1,x
@@ -2793,13 +2789,13 @@ ffff =                  ram_top = -1
                                 set_stat 0
                         
 2aa0 : a615                     ldx zp1+2
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   44
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2aa2 : 08                       php         ;test stores do not alter flags
 2aa3 : 8a                       txa
 2aa4 : 49c3                     eor #$c3
 2aa6 : aa                       tax
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   44
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2aa7 : 28                       plp
 2aa8 : 8e0519                   stx abst+2
 2aab : 08                       php         ;flags after load/store sequence
@@ -2858,13 +2854,13 @@ ffff =                  ram_top = -1
                                 trap_ne
                         
                                 set_stat $ff
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   45
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 2b0f : a614                     ldx zp1+1
 2b11 : 08                       php         ;test stores do not alter flags
 2b12 : 8a                       txa
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   45
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2b13 : 49c3                     eor #$c3
 2b15 : aa                       tax
 2b16 : 28                       plp
@@ -2923,13 +2919,13 @@ ffff =                  ram_top = -1
 2b72 : cd1f19                   cmp fLDx+3  ;test flags
                                 trap_ne
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   46
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
                                 set_stat 0
                         
 2b7e : ae1719                   ldx abs1  
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   46
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2b81 : 08                       php         ;test stores do not alter flags
 2b82 : 8a                       txa
 2b83 : 49c3                     eor #$c3
@@ -2988,13 +2984,13 @@ ffff =                  ram_top = -1
                                 trap_ne
                         
                                 set_stat 0
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   47
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 2bea : ae1a19                   ldx abs1+3
 2bed : 08                       php         ;test stores do not alter flags
 2bee : 8a                       txa
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   47
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2bef : 49c3                     eor #$c3
 2bf1 : aa                       tax
 2bf2 : 28                       plp
@@ -3053,13 +3049,13 @@ ffff =                  ram_top = -1
 2c4c : cd1d19                   cmp fLDx+1  ;test flags
                                 trap_ne
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   48
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_stat $ff
                         
 2c58 : ae1919                   ldx abs1+2
 2c5b : 08                       php         ;test stores do not alter flags
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   48
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2c5c : 8a                       txa
 2c5d : 49c3                     eor #$c3
 2c5f : aa                       tax
@@ -3118,13 +3114,13 @@ ffff =                  ram_top = -1
 2cbe : 08                       php
 2cbf : ec1819                   cpx abs1+1  ;test result
                                 trap_ne
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   49
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 2cc7 : 68                       pla         ;load status
                                 eor_flag 0
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   49
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2cca : cd1d19                   cmp fLDx+1  ;test flags
                                 trap_ne
                         
@@ -3183,13 +3179,13 @@ ffff =                  ram_top = -1
                         
                                 set_stat $ff
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   50
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2d3e : a241                     ldx #$41
 2d40 : 08                       php
 2d41 : ec1919                   cpx abs1+2  ;test result
                                 trap_ne
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   50
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 2d49 : 68                       pla         ;load status
                                 eor_flag lo~fnz ;mask bits not altered
@@ -3248,13 +3244,13 @@ ffff =                  ram_top = -1
                                 trap_ne     ;store to abs data
                         
 2dc4 : 8e0519                   stx abst+2  ;clear                
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   51
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2dc7 : a50f                     lda zpt+3
 2dc9 : 49c3                     eor #$c3
 2dcb : c516                     cmp zp1+3
                                 trap_ne     ;store to zp data
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   51
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 2dd2 : 860f                     stx zpt+3   ;clear                
 2dd4 : ad0619                   lda abst+3
@@ -3313,13 +3309,13 @@ ffff =                  ram_top = -1
                         
 2e41 : a415                     ldy zp1+2
 2e43 : 08                       php         ;test stores do not alter flags
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   52
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2e44 : 98                       tya
 2e45 : 49c3                     eor #$c3
 2e47 : a8                       tay
 2e48 : 28                       plp
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   52
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2e49 : 8c0519                   sty abst+2
 2e4c : 08                       php         ;flags after load/store sequence
 2e4d : 49c3                     eor #$c3
@@ -3378,13 +3374,13 @@ ffff =                  ram_top = -1
                         
                                 set_stat $ff
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   53
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2eb0 : a414                     ldy zp1+1
 2eb2 : 08                       php         ;test stores do not alter flags
 2eb3 : 98                       tya
 2eb4 : 49c3                     eor #$c3
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   53
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2eb6 : a8                       tay
 2eb7 : 28                       plp
 2eb8 : 8c0419                   sty abst+1
@@ -3443,13 +3439,13 @@ ffff =                  ram_top = -1
                                 trap_ne
                         
                                 
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   54
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_stat 0
                         
 2f1f : ac1719                   ldy abs1  
 2f22 : 08                       php         ;test stores do not alter flags
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   54
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2f23 : 98                       tya
 2f24 : 49c3                     eor #$c3
 2f26 : a8                       tay
@@ -3508,13 +3504,13 @@ ffff =                  ram_top = -1
                         
 2f82 : cd1e19                   cmp fLDx+2  ;test flags
                                 trap_ne
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   55
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
                                 set_stat 0
                         
 2f8e : ac1a19                   ldy abs1+3
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   55
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 2f91 : 08                       php         ;test stores do not alter flags
 2f92 : 98                       tya
 2f93 : 49c3                     eor #$c3
@@ -3573,13 +3569,13 @@ ffff =                  ram_top = -1
 2fee : 68                       pla         ;load status
                                 eor_flag lo~fnz ;mask bits not altered
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   56
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 2ff1 : cd1d19                   cmp fLDx+1  ;test flags
                                 trap_ne
                         
                                 set_stat $ff
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   56
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 2ffd : ac1919                   ldy abs1+2
 3000 : 08                       php         ;test stores do not alter flags
@@ -3638,13 +3634,13 @@ ffff =                  ram_top = -1
                         
                                 set_stat 0
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   57
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 3061 : a082                     ldy #$82
 3063 : 08                       php
 3064 : cc1819                   cpy abs1+1  ;test result
                                 trap_ne
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   57
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 306c : 68                       pla         ;load status
                                 eor_flag 0
@@ -3703,13 +3699,13 @@ ffff =                  ram_top = -1
                                 eor_flag lo~fnz ;mask bits not altered
                         
 30d7 : cd1d19                   cmp fLDx+1  ;test flags
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   58
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne
                         
                                 set_stat $ff
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   58
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 30e3 : a041                     ldy #$41
 30e5 : 08                       php
 30e6 : cc1919                   cpy abs1+2   ;test result
@@ -3768,13 +3764,13 @@ ffff =                  ram_top = -1
 315a : 840e                     sty zpt+2   ;clear                
 315c : ad0519                   lda abst+2
 315f : 49c3                     eor #$c3
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   59
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 3161 : cd1919                   cmp abs1+2
                                 trap_ne     ;store to abs+2 data
                         
 3169 : 8c0519                   sty abst+2  ;clear                
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   59
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 316c : a50f                     lda zpt+3
 316e : 49c3                     eor #$c3
 3170 : c516                     cmp zp1+3
@@ -3833,13 +3829,13 @@ ffff =                  ram_top = -1
                                 eor_flag lo~fnz ;mask bits not altered
                         
 31dd : dd1c19                   cmp fLDx,x  ;test flags
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   60
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne
                         
 31e5 : ca                       dex
 31e6 : 10da                     bpl tldax1                  
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   60
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 31e8 : a203                     ldx #3
 31ea :                  tldax2   
@@ -3898,13 +3894,13 @@ ffff =                  ram_top = -1
 3247 : bd0319                   lda abst,x
 324a : 49c3                     eor #$c3
 324c : dd1719                   cmp abs1,x
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   61
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne     ;store to abs,x data
                         
 3254 : 8a                       txa
 3255 : 9d0319                   sta abst,x  ;clear                
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   61
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3258 : ca                       dex
 3259 : 10df                     bpl tstax
                                 next_test
@@ -3963,13 +3959,13 @@ ffff =                  ram_top = -1
 32c1 : 49c3                     eor #$c3
 32c3 : d91719                   cmp abs1,y
                                 trap_ne     ;store to abs data
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   62
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 32cb : 8a                       txa
 32cc : 990319                   sta abst,y  ;clear                
 32cf : 88                       dey
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   62
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 32d0 : 10ec                     bpl tstay
                         
 32d2 : a003                     ldy #3
@@ -4028,13 +4024,13 @@ ffff =                  ram_top = -1
 3331 : 8a                       txa
 3332 : 990319                   sta abst,y  ;clear                
 3335 : 88                       dey
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   63
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 3336 : 10ec                     bpl tstay1
                                 
 3338 : a206                     ldx #6
 333a : a003                     ldy #3
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   63
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 333c :                  tldax4   
                                 set_stat 0
                         
@@ -4093,13 +4089,13 @@ ffff =                  ram_top = -1
                                 trap_ne     ;store to abs data
                         
 339f : 8a                       txa
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   64
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 33a0 : 990319                   sta abst,y  ;clear                
 33a3 : 88                       dey
 33a4 : 10ec                     bpl tstay2
                                 next_test
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   64
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
                         
                                 include "more_tests.i65"
@@ -4158,13 +4154,13 @@ ffff =                  ram_top = -1
 340c : a2fd                     ldx #3+$fa
 340e : bd1d18           tldax7  lda abs1-$fa,x      ;no wrap on indexed abs
 3411 : 9512                     sta zpt-$fa&$ff,x
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   65
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 3413 : ca                       dex
 3414 : e0fa                     cpx #$fa
 3416 : b0f6                     bcs tldax7
                                                   
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   65
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3418 : a203                     ldx #3      ;testing wraparound result
 341a : a000                     ldy #0
 341c : b50c             tstax1  lda zpt,x
@@ -4223,13 +4219,13 @@ ffff =                  ram_top = -1
 3485 : b12e             tlday6  lda (inw1),y    ;no wrap on zp indirect indexed 
 3487 : 8138                     sta (indt-$f8&$ff,x)
 3489 : ca                       dex
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   66
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 348a : ca                       dex
 348b : 88                       dey
 348c : c0f8                     cpy #$f8
 348e : b0f5                     bcs tlday6
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   66
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3490 : a003                     ldy #3      ;testing wraparound result
 3492 : a200                     ldx #0
 3494 : b90319           tstay6  lda abst,y
@@ -4288,13 +4284,13 @@ ffff =                  ram_top = -1
 3502 : 28                       plp
 3503 : 8d0519                   sta abst+2
 3506 : 08                       php         ;flags after load/store sequence
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   67
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 3507 : 49c3                     eor #$c3
 3509 : c941                     cmp #$41    ;test result
                                 trap_ne
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   67
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3510 : 68                       pla         ;load status
                                 eor_flag 0
                         
@@ -4353,13 +4349,13 @@ ffff =                  ram_top = -1
                                 eor_flag lo~fnz ;mask bits not altered
                         
 3579 : cd1d19                   cmp fLDx+1  ;test flags
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   68
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne
                         
                                 set_stat $ff
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   68
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3585 : a515                     lda zp1+2
 3587 : 08                       php         ;test stores do not alter flags
 3588 : 49c3                     eor #$c3
@@ -4418,13 +4414,13 @@ ffff =                  ram_top = -1
 35ee : 08                       php         ;test stores do not alter flags
 35ef : 49c3                     eor #$c3
 35f1 : 28                       plp
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   69
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 35f2 : 850d                     sta zpt+1
 35f4 : 08                       php         ;flags after load/store sequence
 35f5 : 49c3                     eor #$c3
 35f7 : c514                     cmp zp1+1   ;test result
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   69
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 trap_ne
                         
 35fe : 68                       pla         ;load status
@@ -4483,13 +4479,13 @@ ffff =                  ram_top = -1
                         
 3664 : 68                       pla         ;load status
                                 eor_flag lo~fnz ;mask bits not altered
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   70
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 3667 : cd1c19                   cmp fLDx    ;test flags
                                 trap_ne
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   70
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 set_stat $ff
                         
 3673 : ad1819                   lda abs1+1
@@ -4548,13 +4544,13 @@ ffff =                  ram_top = -1
                         
 36d9 : a9c3                     lda #$c3
 36db : 08                       php
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   71
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 36dc : cd1719                   cmp abs1    ;test result
                                 trap_ne
                         
 36e4 : 68                       pla         ;load status
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   71
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 eor_flag 0
                         
 36e7 : cd1c19                   cmp fLDx    ;test flags
@@ -4613,13 +4609,13 @@ ffff =                  ram_top = -1
 374f : cd1c19                   cmp fLDx    ;test flags
                                 trap_ne
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   72
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_stat $ff
                         
 375b : a982                     lda #$82
 375d : 08                       php
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   72
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 375e : cd1819                   cmp abs1+1  ;test result
                                 trap_ne
                         
@@ -4678,13 +4674,13 @@ ffff =                  ram_top = -1
 37d1 : ad0419                   lda abst+1
 37d4 : 49c3                     eor #$c3
 37d6 : cd1819                   cmp abs1+1
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   73
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne     ;store to abs data
                         
 37de : 8e0419                   stx abst+1  ;clear                
 37e1 : a50e                     lda zpt+2
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   73
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 37e3 : 49c3                     eor #$c3
 37e5 : c515                     cmp zp1+2
                                 trap_ne     ;store to zp data
@@ -4743,13 +4739,13 @@ ffff =                  ram_top = -1
                         
 38b2 : 2415                     bit zp1+2   ;41 - should set V (M6) / clear NZ
                                 tst_a 1,~fnz
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   74
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
                                 set_a 1,$ff
                         
 38cc : 2414                     bit zp1+1   ;82 - should set N (M7) & Z / clear V
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   74
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 tst_a 1,~fv
                         
                                 set_a 1,$ff
@@ -4808,13 +4804,13 @@ ffff =                  ram_top = -1
 39e7 : e417                     cpx zp7f
                                 tst_stat fc
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   75
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 39f4 : ca                       dex
 39f5 : e417                     cpx zp7f
                                 tst_stat fzc
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   75
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3a02 : ca                       dex
 3a03 : e417                     cpx zp7f
                                 tst_x $7e,fn
@@ -4873,13 +4869,13 @@ ffff =                  ram_top = -1
 3ae1 : e07f                     cpx #$7f
                                 tst_x $7e,fn
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   76
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_x $80,$ff
                         
 3afb : e07f                     cpx #$7f
                                 tst_stat ~fnz
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   76
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 3b08 : ca                       dex
 3b09 : e07f                     cpx #$7f
@@ -4938,13 +4934,13 @@ ffff =                  ram_top = -1
 3be5 : cc1b19                   cpy abs7f
                                 tst_stat ~fnz
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   77
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 3bf3 : 88                       dey
 3bf4 : cc1b19                   cpy abs7f
                                 tst_stat ~fn
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   77
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3c02 : 88                       dey
 3c03 : cc1b19                   cpy abs7f
                                 tst_y $7e,~fzc
@@ -5003,13 +4999,13 @@ ffff =                  ram_top = -1
                                 set_a $7f,$ff
                         
 3d01 : c517                     cmp zp7f
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   78
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 tst_a $7f,~fn
                         
                                 set_a $7e,$ff
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   78
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3d1b : c517                     cmp zp7f
                                 tst_a $7e,~fzc
                         
@@ -5068,13 +5064,13 @@ ffff =                  ram_top = -1
                                 set_a $7f,$ff
                         
 3e3f : c97f                     cmp #$7f
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   79
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 tst_a $7f,~fn
                         
                                 set_a $7e,$ff
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   79
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 3e59 : c97f                     cmp #$7f
                                 tst_a $7e,~fzc
                         
@@ -5133,13 +5129,13 @@ ffff =                  ram_top = -1
                         
                                 set_a $7f,$ff
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   80
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 3f7d : dd1719                   cmp abs1,x
                                 tst_a $7f,~fn
                         
                                 set_a $7e,$ff
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   80
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 3f98 : dd1719                   cmp abs1,x
                                 tst_a $7e,~fzc
@@ -5198,13 +5194,13 @@ ffff =                  ram_top = -1
 40a7 : c124                     cmp (ind1,x)
                                 tst_a $80,~fnz
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   81
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_a $7f,$ff
                         
 40c1 : c124                     cmp (ind1,x)
                                 tst_a $7f,~fn
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   81
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
                                 set_a $7e,$ff
                         
@@ -5263,13 +5259,13 @@ ffff =                  ram_top = -1
 41c2 : 0a                       asl a
                                 tst_ax rASL,fASL,$ff-fnzc
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   82
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 41d7 : ca                       dex
 41d8 : 10e2                     bpl tasl1
                         
 41da : a203                     ldx #3
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   82
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 41dc :                  tlsr
                                 set_ax zp1,0
                         
@@ -5328,13 +5324,13 @@ ffff =                  ram_top = -1
                         
 429a : a203                     ldx #3
 429c :                  tror
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   83
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_ax zp1,0
                         
 42a2 : 6a                       ror a
                                 tst_ax rROR,fROR,0
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   83
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 42b7 : ca                       dex
 42b8 : 10e2                     bpl tror
@@ -5393,13 +5389,13 @@ ffff =                  ram_top = -1
 4375 :                  tlsr2
                                 set_z zp1,0
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   84
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 437d : 460c                     lsr zpt
                                 tst_z rLSR,fLSR,0
                         
 4395 : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   84
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4396 : 10dd                     bpl tlsr2
 4398 : a203                     ldx #3
 439a :                  tlsr3
@@ -5458,13 +5454,13 @@ ffff =                  ram_top = -1
                         
 4473 : ca                       dex
 4474 : 10dd                     bpl tror2
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   85
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 4476 : a203                     ldx #3
 4478 :                  tror3
                                 set_z zp1,$ff-fc
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   85
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4480 : 660c                     ror zpt
                                 tst_z rROR,fROR,$ff-fnzc
                         
@@ -5523,13 +5519,13 @@ ffff =                  ram_top = -1
 456a : 10da                     bpl tlsr4
 456c : a203                     ldx #3
 456e :                  tlsr5
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   86
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_abs zp1,$ff
                         
 4577 : 4e0319                   lsr abst
                                 tst_abs rLSR,fLSR,$ff-fnzc
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   86
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 4591 : ca                       dex
 4592 : 10da                     bpl tlsr5
@@ -5588,13 +5584,13 @@ ffff =                  ram_top = -1
 4667 : 6e0319                   ror abst
                                 tst_abs rROR,fROR,$ff-fnzc
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   87
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 4681 : ca                       dex
 4682 : 10da                     bpl tror5
                         
 4684 : a203                     ldx #3
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   87
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4686 :                  trorc4
                                 set_abs zp1,fc
                         
@@ -5653,13 +5649,13 @@ ffff =                  ram_top = -1
                         
 4774 : ca                       dex
 4775 : 10dd                     bpl tlsr7
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   88
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 4777 : a203                     ldx #3
 4779 :                  trol6
                                 set_zx zp1,0
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   88
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 4781 : 360c                     rol zpt,x
                                 tst_zx rROL,fROL,0
@@ -5718,13 +5714,13 @@ ffff =                  ram_top = -1
 4857 :                  trorc6
                                 set_zx zp1,fc
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   89
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 485f : 760c                     ror zpt,x
                                 tst_zx rRORc,fRORc,0
                         
 4877 : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   89
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4878 : 10dd                     bpl trorc6
 487a : a203                     ldx #3
 487c :                  trorc7
@@ -5783,13 +5779,13 @@ ffff =                  ram_top = -1
                         
 4959 : 3e0319                   rol abst,x
                                 tst_absx rROL,fROL,0
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   90
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 4973 : ca                       dex
 4974 : 10da                     bpl trol8
 4976 : a203                     ldx #3
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   90
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4978 :                  trol9
                                 set_absx zp1,$ff-fc
                         
@@ -5848,13 +5844,13 @@ ffff =                  ram_top = -1
 4a64 : 10da                     bpl trorc8
 4a66 : a203                     ldx #3
 4a68 :                  trorc9
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   91
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_absx zp1,$ff
                         
 4a71 : 7e0319                   ror abst,x
                                 tst_absx rRORc,fRORc,$ff-fnzc
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   91
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 4a8b : ca                       dex
 4a8c : 10da                     bpl trorc9
@@ -5913,13 +5909,13 @@ ffff =                  ram_top = -1
 4b25 : d0d7                     bne tinc10
 4b27 : ca                       dex
 4b28 : e60c                     inc zpt
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   92
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 4b2a :                  tdec10    
                                 set_stat $ff
                         
 4b2e : c60c                     dec zpt
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   92
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 tst_z rINC,fINC,$ff-fnz
                         
 4b46 : ca                       dex
@@ -5978,13 +5974,13 @@ ffff =                  ram_top = -1
 4bea : e8                       inx
 4beb : e002                     cpx #2
 4bed : d005                     bne tinc13
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   93
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 4bef : a9fe                     lda #$fe
 4bf1 : 8d0319                   sta abst
 4bf4 : e005             tinc13   cpx #5
 4bf6 : d0d4                     bne tinc12
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   93
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4bf8 : ca                       dex
 4bf9 : ee0319                   inc abst
 4bfc :                  tdec12    
@@ -6043,13 +6039,13 @@ ffff =                  ram_top = -1
                         
 4c9e : f60c                     inc zpt,x
                                 tst_zx rINC,fINC,$ff-fnz
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   94
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 4cb6 : b50c                     lda zpt,x
 4cb8 : e8                       inx
 4cb9 : e002                     cpx #2
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   94
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4cbb : d002                     bne tinc15
 4cbd : a9fe                     lda #$fe
 4cbf : e005             tinc15  cpx #5
@@ -6108,13 +6104,13 @@ ffff =                  ram_top = -1
 4d65 : a200                     ldx #0
 4d67 : a97e                     lda #$7e
 4d69 : 9d0319           tinc16  sta abst,x
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   95
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 set_stat $ff
                         
 4d70 : fe0319                   inc abst,x
                                 tst_absx rINC,fINC,$ff-fnz
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   95
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 4d8a : bd0319                   lda abst,x
 4d8d : e8                       inx
@@ -6173,13 +6169,13 @@ ffff =                  ram_top = -1
 4e36 : 250c                     and zpt
                                 tst_ax  absrlo,absflo,0
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   96
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 4e4c : ca                       dex
 4e4d : 10dc                     bpl tand2
 4e4f : a203                     ldx #3
 4e51 : b51c             tand3   lda zpAN,x
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   96
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4e53 : 850c                     sta zpt
                                 set_ax  absANa,$ff
                         
@@ -6238,13 +6234,13 @@ ffff =                  ram_top = -1
                         
 4f29 : ca                       dex
 4f2a : 10df                     bpl tand8
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   97
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 4f2c : a203                     ldx #3
 4f2e :                  tand9
                                 set_ax  absANa,$ff
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   97
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 4f35 : 3d4e19                   and absAN,x
                                 tst_ax  absrlo,absflo,$ff-fnz
                         
@@ -6303,13 +6299,13 @@ ffff =                  ram_top = -1
                                 tst_ay  absrlo,absflo,0
                         
 5000 : 88                       dey
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   98
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 5001 : 10e0                     bpl tand14
 5003 : a003                     ldy #3
 5005 :                  tand15
                                 set_ay  absANa,$ff
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   98
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
 500c : 313a                     and (indAN),y
                                 tst_ay  absrlo,absflo,$ff-fnz
@@ -6368,13 +6364,13 @@ ffff =                  ram_top = -1
                                 set_ax  absEOa,0
                         
 50de : 4d0319                   eor abst
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   99
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 tst_ax  absrlo,absflo,0
                         
 50f5 : ca                       dex
 50f6 : 10da                     bpl teor4
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page   99
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 50f8 : a203                     ldx #3
 50fa : b520             teor5   lda zpEO,x
 50fc : 8d0319                   sta abst
@@ -6433,13 +6429,13 @@ ffff =                  ram_top = -1
                         
 51ca : 88                       dey
 51cb : 10df                     bpl teor10
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  100
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 51cd : a003                     ldy #3
 51cf :                  teor11
                                 set_ay  absEOa,$ff
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  100
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 51d6 : 595219                   eor absEO,y
                                 tst_ay  absrlo,absflo,$ff-fnz
                         
@@ -6498,13 +6494,13 @@ ffff =                  ram_top = -1
 5293 : 8d0f19                   sta ex_orai+1   ;set ORA # operand
                                 set_ax  absORa,0
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  101
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 529d : 200e19                   jsr ex_orai     ;execute ORA # in RAM
                                 tst_ax  absrlo,absflo,0
                         
 52b4 : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  101
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 52b5 : 10da                     bpl tora
 52b7 : a203                     ldx #3
 52b9 : b518             tora1   lda zpOR,x
@@ -6563,13 +6559,13 @@ ffff =                  ram_top = -1
 537d :                  tora6
                                 set_ax  absORa,0
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  102
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 5384 : 1518                     ora zpOR,x
                                 tst_ax  absrlo,absflo,0
                         
 539a : ca                       dex
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  102
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 539b : 10e0                     bpl tora6
 539d : a203                     ldx #3
 539f :                  tora7
@@ -6628,13 +6624,13 @@ ffff =                  ram_top = -1
                                 tst_ay  absrlo,absflo,0
                         
 546c : ca                       dex
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  103
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 546d : ca                       dex
 546e : 88                       dey
 546f : 10de                     bpl tora12
 5471 : a206                     ldx #6
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  103
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5473 : a003                     ldy #3
 5475 :                  tora13
                                 set_ay  absORa,$ff
@@ -6693,13 +6689,13 @@ ffff =                  ram_top = -1
 550b : 200058                   jsr chkadd
 550e : e60c                     inc adfc        ;now with carry
 5510 : e60f                     inc adrl        ;result +1
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  104
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 5512 : 08                       php             ;save N & Z from low result
 5513 : 08                       php
 5514 : 68                       pla             ;accu holds expected flags
 5515 : 2982                     and #$82        ;mask N & Z
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  104
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5517 : 28                       plp
 5518 : d002                     bne tadd1
 551a : e610                     inc adrh        ;result bit 8 - carry
@@ -6758,13 +6754,13 @@ ffff =                  ram_top = -1
 5582 : 290f             tdad1   and #$f         ;lower nibble mask
 5584 : d00c                     bne tdad2       ;no decimal adjust needed
 5586 : c60f                     dec adrl        ;decimal adjust (?0-6)
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  105
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 5588 : c60f                     dec adrl
 558a : c60f                     dec adrl
 558c : c60f                     dec adrl
 558e : c60f                     dec adrl
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  105
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5590 : c60f                     dec adrl
 5592 : c60f             tdad2   dec adrl        ;result -1
 5594 : 18               tdad3   clc             ;test with carry clear
@@ -6823,13 +6819,13 @@ ffff =                  ram_top = -1
 55fd : a955                     lda #$55
 55ff : 6955                     adc #$55
 5601 : c9aa                     cmp #$aa
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  106
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne         ;expected binary result after cld
                         
 5608 : 18                       clc
 5609 : f8                       sed
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  106
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 560a : 08                       php
 560b : a955                     lda #$55
 560d : 6955                     adc #$55
@@ -6888,13 +6884,13 @@ ffff =                  ram_top = -1
                         ; final RAM integrity test
                         ;   verifies that none of the previous tests has altered RAM outside of the
                         ;   designated write areas.
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  107
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 check_ram
                         
                         ; *** DEBUG INFO ***
                         ; to debug checksum errors uncomment check_ram in the next_test macro to
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  107
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         ; narrow down the responsible opcode.
                         ; may give false errors when monitor, OS or other background activity is
                         ; allowed during previous tests.
@@ -6953,13 +6949,13 @@ ffff =                  ram_top = -1
 56ab : 68                       pla             ;check flags
 56ac : 2901                     and #1          ;mask carry
 56ae : c510                     cmp adrh
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  108
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne         ;bad carry
                         
 56b5 : 28                       plp
 56b6 : 08                       php             ;save carry for next add
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  108
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 56b7 : a50d                     lda ad1
 56b9 : ed0419                   sbc sba2        ;perform subtract
 56bc : 08                       php          
@@ -7018,13 +7014,13 @@ ffff =                  ram_top = -1
                         
 5722 : 28                       plp
 5723 : 08                       php             ;save carry for next add
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  109
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 5724 : a50d                     lda ad1
 5726 : f504                     sbc sb2-ad2,x   ;perform subtract
 5728 : 08                       php          
 5729 : c50f                     cmp adrl        ;check result
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  109
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                                 trap_ne         ;bad result
                         
 5730 : 68                       pla             ;check flags
@@ -7083,13 +7079,13 @@ ffff =                  ram_top = -1
                         
 5794 : 68                       pla             ;check flags
 5795 : 2901                     and #1          ;mask carry
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  110
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 5797 : c510                     cmp adrh
                                 trap_ne         ;bad carry
                         
 579e : 28                       plp
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  110
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         ; decimal ADC / SBC (zp,x)
 579f : 08                       php             ;save carry for subtract
 57a0 : a50d                     lda ad1
@@ -7148,13 +7144,13 @@ ffff =                  ram_top = -1
                             endif
                         
                         ; core subroutine of the full binary add/subtract test
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  111
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         ; iterates through all combinations of operands and carry input
                         ; uses increments/decrements to predict result & result flags
 5800 : a511             chkadd  lda adrf        ;add V-flag if overflow
 5802 : 2983                     and #$83        ;keep N-----ZC / clear V
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  111
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5804 : 48                       pha
 5805 : a50d                     lda ad1         ;test sign unequal between operands
 5807 : 450e                     eor ad2
@@ -7213,13 +7209,13 @@ ffff =                  ram_top = -1
 5864 : ed0419                   sbc sba2        ;perform subtract
 5867 : 08                       php          
 5868 : c50f                     cmp adrl        ;check result
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  112
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                                 trap_ne         ;bad result
                         
 586f : 68                       pla             ;check flags
 5870 : 29c3                     and #$c3        ;mask NV----ZC
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  112
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5872 : c511                     cmp adrf
                                 trap_ne         ;bad flags
                         
@@ -7278,13 +7274,13 @@ ffff =                  ram_top = -1
                         
 58db : 68                       pla             ;check flags
 58dc : 29c3                     and #$c3        ;mask NV----ZC
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  113
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 58de : c511                     cmp adrf
                                 trap_ne         ;bad flags
                         
 58e5 : 28                       plp
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  113
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         ; binary ADC / SBC abs,x
 58e6 : 08                       php             ;save carry for subtract
 58e7 : a50d                     lda ad1
@@ -7343,13 +7339,13 @@ ffff =                  ram_top = -1
 594a : 08                       php             ;save carry for subtract
 594b : a50d                     lda ad1
 594d : 6144                     adc (lo adi2-ad2,x) ;perform add
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  114
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 594f : 08                       php          
 5950 : c50f                     cmp adrl        ;check result
                                 trap_ne         ;bad result
                         
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  114
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5957 : 68                       pla             ;check flags
 5958 : 29c3                     and #$c3        ;mask NV----ZC
 595a : c511                     cmp adrf
@@ -7408,13 +7404,13 @@ ffff =                  ram_top = -1
 59b0 : 88                       dey
 59b1 : 28                       plp
                                 trap_cs         ;flags loaded?
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  115
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
                                 trap_vs
                         
                                 trap_mi
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  115
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
                         
                                 trap_eq 
                         
@@ -7473,13 +7469,13 @@ ffff =                  ram_top = -1
                         
 5a24 : c041                     cpy #('D'-3)
                                 trap_ne
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  116
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
                         
 5a2b : 48                       pha             ;save a,x
 5a2c : 8a                       txa
 5a2d : 48                       pha
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  116
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5a2e : ba                       tsx
 5a2f : e0fd                     cpx #$fd        ;check SP
                                 trap_ne
@@ -7538,13 +7534,13 @@ ffff =                  ram_top = -1
                         
                                 set_stat $ff
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  117
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 5a99 : 68                       pla             ;pull x,a
 5a9a : aa                       tax
 5a9b : 68                       pla
 5a9c : e8                       inx             ;return registers with modifications
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  117
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5a9d : 49aa                     eor #$aa        ;N=1, V=1, Z=0, C=1
 5a9f : 60                       rts
                                 trap            ;runover protection
@@ -7603,13 +7599,13 @@ ffff =                  ram_top = -1
                         
                                 set_stat $ff
                         
-AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  118
----------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
-
 5afb : a60b                     ldx irq_x
 5afd : e8                       inx             ;return registers with modifications
 5afe : a50a                     lda irq_a
 5b00 : 49aa                     eor #$aa        ;N=1, V=1, Z=0, C=1 but original flags should be restored
+AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  118
+---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
+
 5b02 : 40                       rti
                                 trap            ;runover protection
                         
@@ -7665,47 +7661,47 @@ ffff =                  ram_top = -1
 5b2a : ba                       tsx
 5b2b : e8                       inx
 5b2c : a901                     lda #1      ;address high
-5b2e : 20df5b                   jsr rhex
+5b2e : 20e85b                   jsr rhex
 5b31 : 8a                       txa         ;address low
-5b32 : 20df5b                   jsr rhex
+5b32 : 20e85b                   jsr rhex
+5b35 : 20e45b           rstack  jsr rspace
+5b38 : bd0001                   lda $100,x  ;stack data
+5b3b : 20e85b                   jsr rhex
+5b3e : e8                       inx
 AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  119
 ---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
 
-5b35 : 20db5b           rstack  jsr rspace
-5b38 : bd0001                   lda $100,x  ;stack data
-5b3b : 20df5b                   jsr rhex
-5b3e : e8                       inx
 5b3f : d0f4                     bne rstack
-5b41 : 20d25b                   jsr rcrlf   ;new line
+5b41 : 20db5b                   jsr rcrlf   ;new line
                         ;show zero page workspace
 5b44 : a900                     lda #0
-5b46 : 20df5b                   jsr rhex
+5b46 : 20e85b                   jsr rhex
 5b49 : a90c                     lda #zpt
 5b4b : aa                       tax
-5b4c : 20df5b                   jsr rhex
-5b4f : 20db5b           rzp     jsr rspace
+5b4c : 20e85b                   jsr rhex
+5b4f : 20e45b           rzp     jsr rspace
 5b52 : b500                     lda 0,x
-5b54 : 20df5b                   jsr rhex
+5b54 : 20e85b                   jsr rhex
 5b57 : e8                       inx
 5b58 : e013                     cpx #zp_bss
 5b5a : d0f3                     bne rzp
-5b5c : 20d25b                   jsr rcrlf
+5b5c : 20db5b                   jsr rcrlf
                         ;show absolute workspace
 5b5f : a919                     lda #hi(data_segment)
-5b61 : 20df5b                   jsr rhex
+5b61 : 20e85b                   jsr rhex
 5b64 : a900                     lda #lo(data_segment)
-5b66 : 20df5b                   jsr rhex
+5b66 : 20e85b                   jsr rhex
 5b69 : a200                     ldx #0
-5b6b : 20db5b           rabs    jsr rspace
+5b6b : 20e45b           rabs    jsr rspace
 5b6e : bd0019                   lda data_segment,x
-5b71 : 20df5b                   jsr rhex
+5b71 : 20e85b                   jsr rhex
 5b74 : e8                       inx
 5b75 : e008                     cpx #(data_bss-data_segment)
 5b77 : d0f2                     bne rabs
                         ;ask to continue
                                 rprt rmsg_cont
                         
-5b87 : 20c55b           rerr1   jsr rget
+5b87 : 20ce5b           rerr1   jsr rget
 5b8a : c943                     cmp #'C'
 5b8c : d0f9                     bne rerr1        
                         ;restore registers
@@ -7732,26 +7728,31 @@ ffff =                  ram_top = -1
                             endif
                                 rprt rmsg_success
                         
-5ba3 : a900                     lda #0
+5ba3 : 78                       sei
+5ba4 : a915                     lda #21
+5ba6 : a200                     ldx #0
+5ba8 : 20f4ff                   jsr $fff4 ; clear keyboard buffer
+5bab : a900                     lda #0
 AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  120
 ---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
 
-5ba5 : 8570                     sta $70
-5ba7 :                  kbd_loop
-5ba7 : a670                     ldx $70
-5ba9 : bc4e5c                   ldy rmsg_kbd,x
-5bac : d00c                     bne kbd_input
-5bae : a915                     lda #21
-5bb0 : 20eeff                   jsr $ffee ; disable VDU
-5bb3 : a262                     ldx #lo(rmsg_basic)
-5bb5 : a05c                     ldy #hi(rmsg_basic)
-5bb7 : 4cf7ff                   jmp $fff7
-5bba :                  kbd_input
-5bba : a98a                     lda #138
-5bbc : a200                     ldx #0
-5bbe : 20f4ff                   jsr $fff4
-5bc1 : e670                     inc $70
-5bc3 : d0e2                     bne kbd_loop
+5bad : 8570                     sta $70
+5baf :                  kbd_loop
+5baf : a670                     ldx $70
+5bb1 : bc575c                   ldy rmsg_kbd,x
+5bb4 : d00d                     bne kbd_input
+5bb6 : 58                       cli
+5bb7 : a915                     lda #21
+5bb9 : 20eeff                   jsr $ffee ; disable VDU
+5bbc : a26b                     ldx #lo(rmsg_basic)
+5bbe : a05c                     ldy #hi(rmsg_basic)
+5bc0 : 4cf7ff                   jmp $fff7
+5bc3 :                  kbd_input
+5bc3 : a98a                     lda #138
+5bc5 : a200                     ldx #0
+5bc7 : 20f4ff                   jsr $fff4 ; put y in keyboard buffer
+5bca : e670                     inc $70
+5bcc : d0e1                     bne kbd_loop
                         ;rsuc1   jsr rget
                         ;        cmp #'R'
                         ;        bne rsuc1
@@ -7760,66 +7761,66 @@ ffff =                  ram_top = -1
                         ;input subroutine
                         ;get a character from standard input 
                         ;adjust according to the needs in your test environment
-5bc5 :                  rget                ;get character in A
-5bc5 : 4cc55b                   jmp rget ; no keyboard input so hang
+5bce :                  rget                ;get character in A
+5bce : 4cce5b                   jmp rget ; no keyboard input so hang
                         ;rget1
                         ;        lda $bff1   ;wait RDRF
                         ;        and #8
                         ;        beq rget1
                         ;not a real ACIA - so RDRF is not checked
-5bc8 : adf0bf                   lda $bff0   ;read acia rx reg
+5bd1 : adf0bf                   lda $bff0   ;read acia rx reg
                         ;the load can be replaced by a call to a kernal routine
                         ;        jsr $ffcf   ;example: CHRIN for a C64
-5bcb : c961                     cmp #'a'    ;lower case
-5bcd : 9002                     bcc rget1
-5bcf : 295f                     and #$5f    ;convert to upper case
-5bd1 : 60               rget1   rts
+5bd4 : c961                     cmp #'a'    ;lower case
+5bd6 : 9002                     bcc rget1
+5bd8 : 295f                     and #$5f    ;convert to upper case
+5bda : 60               rget1   rts
                         
                         ;output subroutines
-5bd2 : a90a             rcrlf   lda #10
-5bd4 : 20f35b                   jsr rchar
-5bd7 : a90d                     lda #13
-5bd9 : d018                     bne rchar
+5bdb : a90a             rcrlf   lda #10
+5bdd : 20fc5b                   jsr rchar
+5be0 : a90d                     lda #13
+5be2 : d018                     bne rchar
                         
-5bdb : a920             rspace  lda #' '
-5bdd : d014                     bne rchar
+5be4 : a920             rspace  lda #' '
+5be6 : d014                     bne rchar
                                 
-5bdf : 48               rhex    pha         ;report hex byte in A
-5be0 : 4a                       lsr a       ;high nibble first
-5be1 : 4a                       lsr a
-5be2 : 4a                       lsr a
-5be3 : 4a                       lsr a
-5be4 : 20ea5b                   jsr rnib
-5be7 : 68                       pla         ;now low nibble
-5be8 : 290f                     and #$f
+5be8 : 48               rhex    pha         ;report hex byte in A
+5be9 : 4a                       lsr a       ;high nibble first
+5bea : 4a                       lsr a
+5beb : 4a                       lsr a
+5bec : 4a                       lsr a
+5bed : 20f35b                   jsr rnib
+5bf0 : 68                       pla         ;now low nibble
+5bf1 : 290f                     and #$f
                         
-5bea : 18               rnib    clc         ;report nibble in A
-5beb : 6930                     adc #'0'    ;make printable 0-9
-5bed : c93a                     cmp #'9'+1
-5bef : 9002                     bcc rchar
-5bf1 : 6906                     adc #6      ;make printable A-F
+5bf3 : 18               rnib    clc         ;report nibble in A
+5bf4 : 6930                     adc #'0'    ;make printable 0-9
+5bf6 : c93a                     cmp #'9'+1
+5bf8 : 9002                     bcc rchar
 AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  121
 ---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
 
+5bfa : 6906                     adc #6      ;make printable A-F
                         
                         ;send a character to standard output 
                         ;adjust according to the needs in your test environment
                         ;register X needs to be preserved!
-5bf3 :                  rchar               ;report character in A
-5bf3 : 4ceeff                   jmp $ffee
+5bfc :                  rchar               ;report character in A
+5bfc : 4ceeff                   jmp $ffee
                         
-5bf6 :                  rmsg_start
-5bf6 : 0a0d5374617274..         db  10,13,"Started testing",10,13,0
-5c0a :                  rmsg_stack
-5c0a : 0a0d7265677320..         db  10,13,"regs Y  X  A  PS PCLPCH",10,13,0
-5c26 :                  rmsg_cont
-5c26 : 0a0d5465737420..         db  10,13,"Test failed",10,13,0
-5c36 :                  rmsg_success
-5c36 : 0a0d416c6c2074..         db  10,13,"All tests completed",10,13,0
-5c4e :                  rmsg_kbd
-5c4e : 41253d310d4348..         db  "A%=1",13,"CHAIN",34,"$.MENU",34,13,0
-5c62 :                  rmsg_basic
-5c62 : 42415349430d             db  "BASIC",13
+5bff :                  rmsg_start
+5bff : 0a0d5374617274..         db  10,13,"Started testing",10,13,0
+5c13 :                  rmsg_stack
+5c13 : 0a0d7265677320..         db  10,13,"regs Y  X  A  PS PCLPCH",10,13,0
+5c2f :                  rmsg_cont
+5c2f : 0a0d5465737420..         db  10,13,"Test failed",10,13,0
+5c3f :                  rmsg_success
+5c3f : 0a0d416c6c2074..         db  10,13,"All tests completed",10,13,0
+5c57 :                  rmsg_kbd
+5c57 : 41253d310d4348..         db  "A%=1",13,"CHAIN",34,"$.MENU",34,13,0
+5c6b :                  rmsg_basic
+5c6b : 42415349430d             db  "BASIC",13
                         
                             if rep_int = 1
                         rmsg_priority
@@ -7862,10 +7863,10 @@ ffff =                  ram_top = -1
                                 dw  absOR+2
                                 dw  absOR+3
                         ;add/subtract indirect pointers
-                        adi2_   dw  ada2            ;indirect pointer to operand 2 in absolute memory
 AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  122
 ---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
 
+                        adi2_   dw  ada2            ;indirect pointer to operand 2 in absolute memory
                         sbi2_   dw  sba2            ;indirect pointer to complemented operand 2 (SBC)
                         adiy2_  dw  ada2-$ff        ;with offset for indirect indexed
                         sbiy2_  dw  sba2-$ff
@@ -7927,10 +7928,10 @@ ffff =                  ram_top = -1
                                 dw  res_trap
                                 dw  irq_trap
                         vec_bss equ $fffa
-                            endif                   ;end of RAM init data
 AS65 Assembler for R6502 [1.42].  Copyright 1994-2007, Frank A. Kingswood                                                Page  123
 ---------------------------------------------------- 6502_functional_test.a65 ----------------------------------------------------
 
+                            endif                   ;end of RAM init data
                             
                             if (load_data_direct = 1) & (ROM_vectors = 1)  
                                 org $fffa       ;vectors
@@ -7939,10 +7940,10 @@ ffff =                  ram_top = -1
                                 dw  irq_trap
                             endif
                         
-5c62 =                          end start
+5c6b =                          end start
                                     
 No errors in pass 2.
-Wrote binary from address $0000 through $5c67.
-Total size 23656 bytes.
+Wrote binary from address $0000 through $5c70.
+Total size 23665 bytes.
 Program start address is at $1b00 (6912).
 

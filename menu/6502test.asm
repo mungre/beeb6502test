@@ -19,8 +19,10 @@ MACRO TEST_WRAPPER n
     .functional_test
     IF n=0
         INCBIN "6502_65C02_functional_tests\6502_functional_test.bin"
+    ELIF n=1
+        INCBIN "6502_65C02_functional_tests\65SC02.bin"
     ELSE
-        INCBIN "6502_65C02_functional_tests\65C02_extended_opcodes_test.bin"
+        INCBIN "6502_65C02_functional_tests\65C02.bin"
     ENDIF
     ALIGN &100
     .functional_test_end
@@ -66,9 +68,11 @@ MACRO TEST_WRAPPER n
     .everything_end
 
     IF n=0
-        SAVE "+.TEST1", everything, everything_end, start
+        SAVE "+.6502", everything, everything_end, start
+    ELIF n=1
+        SAVE "+.65SC02", everything, everything_end, start
     ELSE
-        SAVE "+.TEST2", everything, everything_end, start
+        SAVE "+.65C02", everything, everything_end, start
     ENDIF
 }
 ENDMACRO
@@ -81,5 +85,6 @@ PUTFILE "6502_65C02_functional_tests\bcd_f.bin","+.BCD_F",&6800
 PUTFILE "6502_65C02_functional_tests\bcd_bc.bin","+.BCD_BC",&6800
 PUTFILE "6502_65C02_functional_tests\bcd_fc.bin","+.BCD_FC",&6800
 
-TEST_WRAPPER 0
-TEST_WRAPPER 1
+FOR n,0,2
+TEST_WRAPPER n
+NEXT

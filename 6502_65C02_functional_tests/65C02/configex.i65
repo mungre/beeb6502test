@@ -1,0 +1,15 @@
+; C O N F I G U R A T I O N
+
+;65C02\configex.i65
+
+;Configuration for second processor's 65C02
+;Rockwell instructions, no WDC instructions
+
+        include "..\config.i65"
+
+;added WDC only opcodes WAI & STP (0=test as NOPs, >0=no test)
+wdc_op = 1
+
+;added Rockwell & WDC opcodes BBR, BBS, RMB & SMB
+;(0=test as NOPs, 1=full test, >1=no test)
+rkwl_wdc_op = 1

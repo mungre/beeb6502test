@@ -17,10 +17,6 @@ data_segment = code_segment - $200
         ERROR ERROR ERROR low byte of data_segment MUST be $00 !!
     endif
 
-;added Rockwell & WDC opcodes BBR, BBS, RMB & SMB
-;(0=test as NOPs, 1=full test, >1=no test)
-rkwl_wdc_op = 0
-
 ;report errors through I/O channel (0=use standard self trap loops, 1=include
 ;report.i65 as I/O channel, add 3.5 kB)
 report = 1

@@ -107,12 +107,17 @@ report_success
         jsr rhex
     endif
         rprt rmsg_success
+        sei
+        lda #21
+        ldx #0
+        jsr $fff4 ; clear keyboard buffer
         lda #0
         sta $70
 kbd_loop
         ldx $70
         ldy rmsg_kbd,x
         bne kbd_input
+        cli
         lda #21
         jsr $ffee ; disable VDU
         ldx #lo(rmsg_basic)
@@ -121,7 +126,7 @@ kbd_loop
 kbd_input
         lda #138
         ldx #0
-        jsr $fff4
+        jsr $fff4 ; put y in keyboard buffer
         inc $70
         bne kbd_loop
 ;rsuc1   jsr rget
