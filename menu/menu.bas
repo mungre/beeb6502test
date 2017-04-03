@@ -9,9 +9,9 @@
 600VDU31,0,T%-3
 610PRINT "    CPU Tests"
 620PRINT'
-700PRINT"    1 BBC Model B (6502)"
-800PRINT"    2 BBC Master (65SC02)"
-900PRINT"    3 Tube (65C02)"
+700PRINT"    1 6502   (BBC Model B)"
+800PRINT"    2 65SC02 (BBC Master or Tube)"
+900PRINT"    3 65C02  (Tube)"
 1030PRINT
 1100PRINT"    4 No BCD test"
 1200PRINT"    5 Basic BCD test"
